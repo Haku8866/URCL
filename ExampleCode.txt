@@ -1,0 +1,6 @@
+Try to get this code to compile to your ISA using your json config file!
+
+IMM $1, 15     // Initiate variables
+IMM $2, 10
+ADD $3, $1, $2 // Add them, and store it in register #3.
+HLT 	       // Halt the program.
