@@ -3,6 +3,7 @@
 
     "REGISTERS":"8",
     "LINENUMS":true,
+    "DATABUS_WIDTH":"8",
 
     "CUSTOM_FIELD": "You can use this for your after-effect code! Maybe turn it into a list of special opcodes in your ISA?",
     "AFTEREFFECT":"for x in range(0, len(code)):\n    code[x] = code[x] + f'          // This is an after effect on line {x}!'",
