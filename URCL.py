@@ -24,7 +24,7 @@ operands = {"ADD":   3,"SUB":   3,"BSR":   3,"BSL":   3,"ADC":   3,"SBB":   3,"I
             "MLT":   3,"DIV":   3,"MOD":   3,"SQRT":  2,"CAL":   1,"RET":   0,"PSH":   1,
             "POP":   1,"BRL":   3,"BRG":   3,"BRE":   3,"BNE":   3,"IN":    2,"OUT":   2,
             "BOD":   2,"BEV":   2,"RSH":   2,"LSH":   2,"CMP":   2,"SRS":   3,"BSS":   3,
-            "BLE":   3,"BGE":   3}
+            "BLE":   3,"BGE":   3,"BITS":  2,"MINREG":1,"MINRAM":1,"IMPORT":0}
 
 fname = input("File to compile? ")+".txt"
 try:
@@ -85,7 +85,38 @@ for y in range(0, len(file)):
         ops = operands[line[0]]
     except:
         continue
-    if ISA_Table[line[0]] == []:
+    if line[0] == "IMPORT":
+        continue
+    elif line[0] == "BITS":
+        if line[1] == ">=":
+            if int(ISA_Table["DATABUS_WIDTH"]) < int(line[2]):
+                print(f"Your CPU does not meet the requirements for this program. Problem: Data bus too thin. (Minimum: {line[2]})")
+                input()
+                sys.exit()
+        elif line[1] == "<=":
+            if int(ISA_Table["DATABUS_WIDTH"]) > int(line[2]):
+                print(f"Your CPU does not meet the requirements for this program. Problem: Data bus too wide. (Maximum: {line[2]})")
+                input()
+                sys.exit()
+        else:
+            if int(ISA_Table["DATABUS_WIDTH"]) != int(line[2]):
+                print(f"Your CPU does not meet the requirements for this program. Problem: Data bus wrong width. (Must be {line[2]})")
+                input()
+                sys.exit()
+        continue
+    elif line[0] == "MINRAM":
+        if int(ISA_Table["MEMORY"]) < int(line[1]):
+            print(f"Your CPU does not meet the requirements for this program. Problem: Not enough memory. (Must be {line[1]})")
+            input()
+            sys.exit()
+        continue
+    elif line[0] == "MINREG":
+        if int(ISA_Table["REGISTERS"]) < int(line[1]):
+            print(f"Your CPU does not meet the requirements for this program. Problem: Not enough registers. (Must be {line[1]})")
+            input()
+            sys.exit()
+        continue
+    elif ISA_Table[line[0]] == []:
         omitted += 1
         continue
     try:
@@ -104,10 +135,24 @@ for y in range(0, len(file)):
             try:
                 int(line[x])
             except:
-                if line[x][0] == "R":
+
+                if line[x][0] == "#":
+                    num = 0
+                    try:
+                        if line[x][1] == "+":
+                            num = int(line[x][2:])
+                        elif line[x][1] == "-":
+                            num = int(line[x][2:])*-1
+                    except:
+                        pass
+                    line[x] = str(int(ISA_Table["DATABUS_WIDTH"])+num)
+                elif line[x][0] == "R":
                     line[x]= "$" + line[x][1:]
                 if not line[x] in var:
-                    var.append(line[x])
+                    try:
+                        int(line[x])
+                    except:
+                        var.append(line[x])
     newlines = ISA_Table[line[0]].copy()
     length = len(code)
     for x in range(0, len(newlines)):
