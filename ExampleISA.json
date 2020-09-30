@@ -2,6 +2,7 @@
     "----URCL documentation----":"https://docs.google.com/spreadsheets/d/14u15VlSYORlt8EQu3C0ow0LTppoeio9gm2_z0Q4bOD8/edit?usp=sharing",
 
     "REGISTERS":"8",
+    "MEMORY": "32",
     "LINENUMS":true,
     "DATABUS_WIDTH":"8",
 
