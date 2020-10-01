@@ -26,7 +26,7 @@ operands = {"ADD":   3,"SUB":   3,"BSR":   3,"BSL":   3,"ADC":   3,"SBB":   3,"I
             "BOD":   2,"BEV":   2,"RSH":   2,"LSH":   2,"CMP":   2,"SRS":   3,"BSS":   3,
             "BLE":   3,"BGE":   3,"BITS":  2,"MINREG":1,"MINRAM":1,"IMPORT":0}
 
-fname = input("File to compile? (include extension) ")
+fname = input("File to compile? ")
 try:
     f = open(fname)
     file = []
@@ -44,7 +44,10 @@ def snip(line):
     line = line.split("//")[0]
     line = line.strip()
     line = line.replace(",","")
-    line = line.strip()
+    line = line.split(" ")
+    for x in range(0, len(line)):
+        line[x] = line[x].strip()
+    line = " ".join(line)
     return line
 
 for x in range(0, len(file)):
