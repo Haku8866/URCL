@@ -1,8 +1,8 @@
 {
     "----URCL documentation----":"https://docs.google.com/spreadsheets/d/14u15VlSYORlt8EQu3C0ow0LTppoeio9gm2_z0Q4bOD8/edit?usp=sharing",
 
-    "REGISTERS":"8",
-    "MEMORY": "32",
+    "REGISTERS":"1024",
+    "MEMORY": "1024",
     "LINENUMS":true,
     "DATABUS_WIDTH":"8",
 
@@ -39,7 +39,7 @@
     "BRN":   [],
     "BRP":   [],
     "NOP":   [],
-    "----NOTE-----": "This is an example of a zero-operand instruction. You do not need <A>, <B>, or <C>",
+    "----NOTE-----": "This is an example of a zero-operand instruction. You do not need <A>, <B>, or <C>.",
     "HLT":   ["HLT"],
 
     "----COMPLEX----": "These are complex instructions. You may wish to leave them blank if your CPU does not support them. In a future version, you may choose to use pre-written subroutines for these using only the core instructions.",
