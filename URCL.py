@@ -27,39 +27,34 @@ operands = {"ADD":   3,"SUB":   3,"BSR":   3,"BSL":   3,"ADC":   3,"SBB":   3,"I
             "BLE":   3,"BGE":   3,"BITS":  2,"MINREG":1,"MINRAM":1,"IMPORT":0}
 
 cmplx_subs = {
-    "MLT": ["IMM <A> 0","BEV +2 <C>","ADD <A> <A> <B>","LSH <B> <B>","RSH <C> <C>","BNZ -4"],
+    "MLT": ["IMM <A> 0","BEV +2 <C>","ADD <A> <A> <B>","LSH <B> <B>","RSH <C> <C>","BNZ -4"], # Original by: Kuggo              Optimised by: Haku
     "DIV": [],
     "MOD": [],
     "CAL": [],
     "RET": [],
     "PSH": [],
     "POP": [],
-    "BRL": [],
-    "BRG": [],
-    "BRE": [],
-    "BNE": [],
+    "BRL": ["SUB $0 <B> <C>","BNC <A>"],                                                      # Original by: Mod Punchtree
+    "BRG": ["SUB $0 <C> <B>","BNC <A>"],                                                      # Original by: Mod Punchtree
+    "BRE": ["CMP <B> <C>","BRZ <A>"],                                                         # Original by: Verlio_H
+    "BNE": ["CMP <B> <C>","BNZ <A>"],                                                         # Original by: Verlio_H
     "BOD": [],
     "BEV": [],
     "BLE": [],
     "BGE": [],
     "IN":  [],
     "OUT": [],
-    "BSR": [],
-    "BSL": [],
+    "BSR": ["MOV *1 <C>","MOV <A> <B>","RSH <A> <A>","DEC *1 *1","BNZ -2"],                   # Original by: Verlio_H           Optimised by: Haku
+    "BSL": ["MOV *1 <C>","MOV <A> <B>","LSH <A> <A>","DEC *1 *1","BNZ -2"],                   # Original by: Verlio_H           Optimised by: Haku
     "SRS": [],
     "BSS": [],
-    "CMP": [],
-    "ADC": [],
+    "CMP": ["SUB $0 <A> <B>"],                                                                # Original by: Verlio_H
+    "ADC": ["BNC +3","INC <A> <B>","BRA +2","MOV <A> <B>","ADD <A> <A> <C>"],                 # Original by: Haku
     "SBB": [],
     }
 
-''' BSR CODE TO BE IMPLEMENTED AFTER TEMPORARY VARIABLES ARE SUPPORTED
-            //BSR $A $B $C
-MOV $X <C>  //set X to C
-MOV <A> <B> //copy B to A
-RSH <A> <A> //shift A right
-DEC $X      //decrement counter
-BNZ -2      //if not done, loop
+'''
+
 '''
 
 fname = input("File to compile? ")
@@ -89,7 +84,7 @@ def snip(line):
         for char in line[x]:
             if char.isalpha() or char.isnumeric():
                 continue
-            elif char not in "#+-$: ":
+            elif char not in " -+=:*#$":
                 striplist.append(char)
         if striplist != []:
             for char in striplist:
@@ -127,7 +122,14 @@ def fixLabels(file):
             label_list.append(label)
             count += 1
 
+tvar = []
+
 def replaceComplex(file):
+    global var
+    global repeat
+    global tvar
+    tvar2 = []
+    br = False
     for x in range(0, len(file)):
         line = file[x].split()
         if line[0] == "BITS" or line[0] == "IMPORT" or line[0] == "MINREG" or line[0] == "MINRAM":
@@ -135,6 +137,7 @@ def replaceComplex(file):
         if ISA_Table[line[0]] == []:
             if cmplx_subs[line[0]] != []:
                 repeat = True
+                br = True
                 newlines = cmplx_subs[line[0]]
                 ops = operands[line[0]]
                 try:
@@ -151,13 +154,54 @@ def replaceComplex(file):
                         newlines[y] = newlines[y].replace("<C>", line[3])
                     if y == 0 and label != "":
                         newlines[y] += label
+                    newline = newlines[y].split(" ")
+                    ops2 = operands[newline[0]]
+                    if ops2 > 0:
+                        for z in range(1, ops2+1):
+                            if newline[z][0] == "*":
+                                newline[z] = "$" + str(int(newline[z][1:])+len(var))
+                                tvar2.append("$" + str(int(newline[z][1:])+len(var)))
+                    newlines[y] = " ".join(newline)
                 newlines.reverse()
                 file.pop(x)
                 for newline in newlines:
                     file.insert(x, newline)
+        if len(tvar2) > len(tvar):
+            tvar = tvar2
+        if br:
+            break
 
 file = list(filter(None, file))
 fixLabels(file)
+
+def countRegs(file):
+    global var
+    for line in file:
+        line = line.split()
+        ops = operands[line[0]]
+        if ops != 0:
+            for x in range(1, ops+1):
+                try:
+                    int(line[x])
+                except:
+                    if line[x][0] == "#":
+                        num = 0
+                        try:
+                            if line[x][1] == "+":
+                                num = int(line[x][2:])
+                            elif line[x][1] == "-":
+                                num = int(line[x][2:])*-1
+                        except:
+                            pass
+                        line[x] = str(int(ISA_Table["DATABUS_WIDTH"])+num)
+                    elif line[x][0] == "R":
+                        line[x] = "$" + line[x][1:]
+                    if not line[x] in var and line[x] != "$0":
+                        try:
+                            int(line[x])
+                        except:
+                            var.append(line[x])
+countRegs(file)
 repeat = True
 while repeat:
     repeat = False
@@ -220,27 +264,16 @@ for y in range(0, len(file)):
         pass
     if ops != 0:
         for x in range(1, ops+1):
-            try:
-                int(line[x])
-            except:
-
-                if line[x][0] == "#":
-                    num = 0
-                    try:
-                        if line[x][1] == "+":
-                            num = int(line[x][2:])
-                        elif line[x][1] == "-":
-                            num = int(line[x][2:])*-1
-                    except:
-                        pass
+            if line[x][0] == "#":
+                num = 0
+                try:
+                    if line[x][1] == "+":
+                        num = int(line[x][2:])
+                    elif line[x][1] == "-":
+                        num = int(line[x][2:])*-1
+                except:
+                    pass
                     line[x] = str(int(ISA_Table["DATABUS_WIDTH"])+num)
-                elif line[x][0] == "R":
-                    line[x]= "$" + line[x][1:]
-                if not line[x] in var:
-                    try:
-                        int(line[x])
-                    except:
-                        var.append(line[x])
     newlines = ISA_Table[line[0]].copy()
     length = len(code)
     for x in range(0, len(newlines)):
@@ -278,7 +311,10 @@ for x in range(0, len(code)):
     for label in label_list:
         code[x] = code[x].replace(f"({label})", "")
         code[x] = code[x].replace(label, str(labels[label]))
-print(f"\nVariables: {var}")
+if len(tvar) + len(var) > int(ISA_Table["REGISTERS"]):
+    print("\nWarning: You do not have enough registers to run this script. (Try using some memory instead?)")
+print(f"\nVariables:           {var}")
+print(f"Temporary variables: {tvar}")
 print(f"# of unsupported instructions stripped: {omitted}")
 print(f"\n{ISA[:-5]} code:\n")
 if ISA_Table["AFTEREFFECT"] != "":
