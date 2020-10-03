@@ -27,34 +27,33 @@ operands = {"ADD":   3,"SUB":   3,"BSR":   3,"BSL":   3,"ADC":   3,"SBB":   3,"I
             "BLE":   3,"BGE":   3,"BITS":  2,"MINREG":1,"MINRAM":1,"IMPORT":0}
 
 cmplx_subs = {
-    "MLT": ["IMM <A> 0","BEV +2 <C>","ADD <A> <A> <B>","LSH <B> <B>","RSH <C> <C>","BNZ -4"], # Original by: Kuggo              Optimised by: Haku
+    "MLT": ["MOV *1 <B>","MOV *2 <C>","IMM <A> 0","BEV +2 *2","ADD <A> <A> *1","LSH *1 *1","RSH *2 *2","BNZ -4"], # Original by: Kuggo              Optimised by: Haku
     "DIV": [],
     "MOD": [],
     "CAL": [],
     "RET": [],
     "PSH": [],
     "POP": [],
-    "BRL": ["SUB $0 <B> <C>","BNC <A>"],                                                      # Original by: Mod Punchtree
-    "BRG": ["SUB $0 <C> <B>","BNC <A>"],                                                      # Original by: Mod Punchtree
-    "BRE": ["CMP <B> <C>","BRZ <A>"],                                                         # Original by: Verlio_H
-    "BNE": ["CMP <B> <C>","BNZ <A>"],                                                         # Original by: Verlio_H
+    "BRL": ["SUB $0 <B> <C>","BNC <A>"],                                                                          # Original by: Mod Punchtree
+    "BRG": ["SUB $0 <C> <B>","BNC <A>"],                                                                          # Original by: Mod Punchtree
+    "BRE": ["CMP <B> <C>","BRZ <A>"],                                                                             # Original by: Verlio_H
+    "BNE": ["CMP <B> <C>","BNZ <A>"],                                                                             # Original by: Verlio_H
     "BOD": [],
     "BEV": [],
     "BLE": [],
     "BGE": [],
     "IN":  [],
     "OUT": [],
-    "BSR": ["MOV *1 <C>","MOV <A> <B>","RSH <A> <A>","DEC *1 *1","BNZ -2"],                   # Original by: Verlio_H           Optimised by: Haku
-    "BSL": ["MOV *1 <C>","MOV <A> <B>","LSH <A> <A>","DEC *1 *1","BNZ -2"],                   # Original by: Verlio_H           Optimised by: Haku
+    "BSR": ["MOV *1 <C>","MOV <A> <B>","RSH <A> <A>","DEC *1 *1","BNZ -2"],                                       # Original by: Verlio_H           Optimised by: Haku
+    "BSL": ["MOV *1 <C>","MOV <A> <B>","LSH <A> <A>","DEC *1 *1","BNZ -2"],                                       # Original by: Verlio_H           Optimised by: Haku
     "SRS": [],
     "BSS": [],
-    "CMP": ["SUB $0 <A> <B>"],                                                                # Original by: Verlio_H
-    "ADC": ["BNC +3","INC <A> <B>","BRA +2","MOV <A> <B>","ADD <A> <A> <C>"],                 # Original by: Haku
+    "CMP": ["SUB $0 <A> <B>"],                                                                                    # Original by: Verlio_H
+    "ADC": ["BNC +3","INC <A> <B>","BRA +2","MOV <A> <B>","ADD <A> <A> <C>"],                                     # Original by: Haku
     "SBB": [],
     }
 
 '''
-
 '''
 
 fname = input("File to compile? ")
