@@ -1,0 +1,6 @@
+See if you can get this code to compile to your ISA by filling in a .py config file!
+
+IMM R1, 15
+IMM R2, 10
+ADD R1, R1, R2
+HLT
