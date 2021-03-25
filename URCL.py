@@ -363,7 +363,7 @@ def replaceComplex(program):
             program[x].label,
             program[x].operandList,
         )
-        if len(ISA.Instruction_table.get(opcode)) == 1 and cmplx_subs.get(opcode) != None:
+        if len(ISA.Instruction_table.get(opcode, [1])) == 1 and cmplx_subs.get(opcode) != None:
             if opcode == "CAL":
                 pop = "LOD"
                 psh = "STR"
