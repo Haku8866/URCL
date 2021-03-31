@@ -660,24 +660,29 @@ def allocateReservedRAM(program):
     global maxRes
     labels = []
     operandLists = []
-    if RUNRAM:
-        for line in program:
-            labels.append(line.label)
-            operandLists.append(line.operandList)
-        for lst in operandLists:
-            for item in lst:
-                if item[:5] == ".RES_" and item not in labels:
-                    if int(item[5:]) > maxRes:
-                        maxRes = int(item[5:])
-                    program.append(instruction(item,"DW",["0"]))
-                    labels.append(item)
-    else:
-        for x, line in enumerate(program):
-            for y, operand in enumerate(program[x].operandList):
-                if operand[:5] == ".RES_":
-                    if int(item[5:]) > maxRes:
-                        maxRes = int(item[5:])
-                    program[x].operandList[y] = f"#{MINRAM+int(operand[5:])}"
+    flag = False
+    for line in program:
+        if line.opcode == "STR" or line.opcode == "LOD":
+            flag = True
+    if flag:
+        if RUNRAM:
+            for line in program:
+                labels.append(line.label)
+                operandLists.append(line.operandList)
+            for lst in operandLists:
+                for item in lst:
+                    if item[:5] == ".RES_" and item not in labels:
+                        if int(item[5:]) > maxRes:
+                            maxRes = int(item[5:])
+                        program.append(instruction(item,"DW",["0"]))
+                        labels.append(item)
+        else:
+            for x, line in enumerate(program):
+                for y, operand in enumerate(program[x].operandList):
+                    if operand[:5] == ".RES_":
+                        if int(operand[5:]) > maxRes:
+                            maxRes = int(operand[5:])
+                        program[x].operandList[y] = f"#{MINRAM+int(operand[5:])}"
     return program
 
 def regSubstitution(program):
@@ -688,7 +693,7 @@ def regSubstitution(program):
         done = True
         for x, line in enumerate(program):
             label = line.label
-            if ISA.Instruction_table[line.opcode][0] and line.opcode not in blocked:
+            if (ISA.Instruction_table[line.opcode][0] or ISA.Instruction_table.get(line.opcode, True)) and line.opcode not in blocked:
                 offenders = []
                 for y, operand in enumerate(line.operandList):
                     if operand[0] != "$" and operand[0] not in offenders and y > 0:
@@ -698,20 +703,26 @@ def regSubstitution(program):
                 program[x].label = ""
                 insert = []
                 originalMaxRes = maxRes
+                buffer = 0
+                temp = []
                 for y,offender in enumerate(offenders):
-                    insert.append(instruction(label, "STR", [f".RES_{maxRes+y+1}", f"${y+1}"]))
-                    insert.append(instruction("", "IMM", [f"${y+1}", offender]))
+                    while ((f"${y+1}" == line.operandList[0] and operands[line.opcode] < 2)) and f"${y+1+buffer}" in line.operandList:
+                        buffer += 1
+                    insert.append(instruction(label, "STR", [f".RES_{maxRes+y+1}", f"${y+1+buffer}"]))
+                    insert.append(instruction("", "IMM", [f"${y+1+buffer}", offender]))
+                    temp.append(f"${y+1+buffer}")
                     for z, item in enumerate(line.operandList):
                         if offender == item:
-                            program[x].operandList[z] = f"${y+1}"
+                            program[x].operandList[z] = f"${y+1+buffer}"
                     maxRes += 1
                     label = ""
                 insert.append(program[x])
-                for y,offender in enumerate(offenders):
-                    if f"${y+1}" != line.operandList[0] or (f"${y+1}" != line.operandList[0] and operands[line.opcode] > 1):
-                        insert.append(instruction("", "LOD", [f"${y+1}", f".RES_{originalMaxRes+y+1}"]))
+                for t in temp:
+                    if t != line.operandList[0] or (t == line.operandList[0] and operands[line.opcode] < 2):
+                        insert.append(instruction("", "LOD", [t, f".RES_{originalMaxRes+y+1}"]))
                 program = program[:x] + insert + program[x+1:]
                 done = False
+                maxRes = originalMaxRes
                 break
     return program
 
