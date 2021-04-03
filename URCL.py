@@ -383,7 +383,6 @@ def replaceComplex(program):
                         regs = program[y].label.split("#")[1][:-1]
                         for z in range(y,len(program)):
                             if program[z].opcode == "RET":
-                                #program[z].opcode = "JMP"
                                 program[z].operandList.append(f"${int(regs)+1}")
                                 break
                         break
@@ -442,9 +441,6 @@ def replaceComplex(program):
                     z = len(form)-z
                     if not (str(z) in outputs):
                         insert.append(instruction("",pop,[f"${z}"] if swapped else [f"${z}", f".RES_{z}"]))
-                    #else:
-                    #    if swapped:
-                    #        insert.append(instruction("",pop,["$0"]))
                 program = program[:x] + insert + program[x+1:]
                 return False, program
             else:
@@ -479,6 +475,10 @@ def optimise(program):
             if line.opcode == "RET" and line.operandList != []:
                 program[x].opcode = "JMP"
     return program
+def countPatternLength(segments):
+    segments = " ".join(segments)
+    segments = "".join(list(filter(lambda a: a not in " _", segments)))
+    return len(segments)
 
 def fixImmediates(program):
     global JMPnching_ops
@@ -491,10 +491,32 @@ def fixImmediates(program):
                     program[x].operandList[y] = program[x].operandList[y][1:]
                 if operand[0] == "M" and operand[1:].isnumeric():
                     program[x].operandList[y] = program[x].operandList[y][1:]
+                if len(list(filter(lambda a: a in "10()", operand))) == len(operand) and "(" in operand and ")" in operand:
+                    bits = int(ISA.CPU_stats["DATABUS_WIDTH"])
+                    segments = []
+                    pattern = operand.split("(")
+                    pattern = " _".join(pattern)
+                    pattern = pattern.split(")")
+                    pattern = " ".join(pattern)
+                    pattern = pattern.split()
+                    for segment in pattern:
+                        segments.append(segment)
+                    done = False
+                    while not done:
+                        for z, part in enumerate(pattern):
+                            if done:
+                                break
+                            if part[0] != "_":
+                                continue
+                            for w in range(1, len(part)):
+                                segments[z] += part[w]
+                                if countPatternLength(segments) == bits:
+                                    done = True
+                                    break
+                    segments = " ".join(segments)
+                    segments = "".join(list(filter(lambda a: a not in " _", segments)))
+                    program[x].operandList[y] = str(int(segments, 2))
                 else:
-                    # TODO: Bit patterns
-                    # How to detect them?
-                    # How to expand them?
                     pass
     return program
 
