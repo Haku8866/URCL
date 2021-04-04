@@ -552,17 +552,17 @@ def readHeaders(program):
     global RUNRAM
     global MINREG
     global MINRAM
+
+    BITS = ISA.CPU_stats['DATABUS_WIDTH']
+    RUNRAM = ISA.CPU_stats["RUN_RAM"]
     done = False
     while not done:
         for x, line in enumerate(program):
             if line.opcode == "BITS":
-                BITS = (line.operandList[0], int(line.operandList[1]))
                 if not eval(f"{ISA.CPU_stats['DATABUS_WIDTH']} {BITS[0]} {BITS[1]}"):
                     print(f"WARNING: this program is designed for a CPU with a databus width {BITS[0]} {BITS[1]}. (Target ISA is {ISA.CPU_stats['DATABUS_WIDTH']})")
                 program.pop(x)
             elif line.opcode == "RUN":
-                if ("RAM" == line.operandList[0]): 
-                    RUNRAM = True
                 if not (RUNRAM == ISA.CPU_stats["RUN_RAM"]):
                     print(f"WARNING: this program is designed for a CPU that runs from {line.operandList[0]}. (Target ISA runs from {ISA.CPU_stats['RUN_RAM']})")
                 program.pop(x)
@@ -715,7 +715,7 @@ def regSubstitution(program):
         done = True
         for x, line in enumerate(program):
             label = line.label
-            if (ISA.Instruction_table[line.opcode][0] or ISA.Instruction_table.get(line.opcode, True)) and line.opcode not in blocked:
+            if ISA.Instruction_table.get(line.opcode, [True])[0] and line.opcode not in blocked:
                 offenders = []
                 for y, operand in enumerate(line.operandList):
                     if operand[0] != "$" and operand[0] not in offenders and y > 0:
