@@ -1,12 +1,15 @@
 CPU_stats = {
-  "REGISTERS":"",
-  "MEMORY": "",
-  "DATABUS_WIDTH": "",
-  "RUN_RAM": False,
-  "LINENUMS": False,
+  "REGISTERS":"8",
+  "MEMORY": "256",
+  "DATABUS_WIDTH": "8",
+  "RUN_RAM": True,
   "MANUAL_LABEL_REMOVAL": False,
-  "STR_OVER_PSH": False,
-    }
+  "SP_IS_REG": True,
+  "SP_LOCATION": 255,
+  "FLIPPED_STACK": False,
+  "STACK_START": 0,
+  "MANUAL_SP_REMOVAL": False,
+  }
 Instruction_table = {
     "ADD":   [True, ""],
     "SUB":   [True, ""],
@@ -35,24 +38,19 @@ Instruction_table = {
     "NOP":   [True, ""],
     "HLT":   [True, ""],
     "DW":    [True, ""], # Only for RUN RAM
-    "PSH":   [True, ""],
-    "POP":   [True, ""],
     "IN":    [False, ""], # IN cannot accept a register
     "OUT":   [True, ""],
     }
 from URCL import instruction
 def RemoveLabels(code):
     return code
+def getProgramLength(code):
+    return 0
 def RawURCL(code):
-    for i, ins in enumerate(code):
     return code
 def CleanURCL(code):
     return code
 def LabelISA(code):
-    for i, ins in enumerate(code):
-        pass
     return code
 def FinalISA(code):
-    for i, ins in enumerate(code):
-        pass
     return code

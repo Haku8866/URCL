@@ -1,4 +1,5 @@
 import sys as s
+import os
 import copy
 end = (
     lambda ex, tag: input(f"\n--- Something went wrong :( ---\n\n{ex} {tag}\n")
@@ -14,6 +15,11 @@ class instruction:
 labelCount, regUsage, ramUsage = 0, [], []
 
 maxRes = 0
+SPreg = 0
+fixSP = True
+spisreg = True
+usestacknotreg = False
+temp = 0
 MINRAM = 0
 MINREG = 0
 BITS = ("", 0)
@@ -127,6 +133,8 @@ cmplx_subs = {
     "BSS": [],
     "MOD": [],
     "CAL": ["special"],
+    "PSH": ["special"],
+    "POP": ["special"],
     "MLT": [
         instruction("", "PSH", ["<B>"]),
         instruction("", "IMM", ["<A>", "0"]),
@@ -246,7 +254,7 @@ cmplx_subs = {
     ],
     "BGE": [
       instruction("", "CMP", ["<B>","<C>"]),
-      instruction("", "BNC", ["<A>"])
+      instruction("", "BRC", ["<A>"])
     ],
     "BZR": [
       instruction("", "ADD", ["<B>", "<B>", "$0"]),
@@ -266,7 +274,6 @@ def importProgram(name):
             "- try checking:\n1. Is it in a different folder to URCL.py?\n2. Are you running URCL.py from elsewhere?\n 3. 'invalid syntax'? An error with the ISA designer's code.",
         )
 
-
 def removeComments(program):
     for y in range(len(program)):
         line = program[y].rstrip("\n").split("//")[0].split(";")[0].strip().split(" ")
@@ -276,11 +283,13 @@ def removeComments(program):
             line[x] = line[x].strip()
             if len(line[x]) >= 2 and line[x][0] == "R" and line[x][1].isnumeric():
                 line[x] = "$" + line[x][1:]
+            if len(line[x]) >= 2 and line[x][0] == "M" and line[x][1].isnumeric():
+                line[x] = "#" + line[x][1:]
             line[x] = "".join(
                 list(
                     filter(
                         lambda a: (
-                            a in " _.-+=*<()>$#" or a.isnumeric() or a.isalpha()
+                            a in " _.-+=*<()>$#&" or a.isnumeric() or a.isalpha()
                         ),
                         line[x],
                     )
@@ -341,9 +350,9 @@ def fixLabels(program):
             "- try checking:\n1. Is there a bug in the URCL program, such as JMPnching past the end?\n2. If not, this may be an error with URCL.py, if you are sure it is, then please report it on the URCL discord. (https://discord.gg/jWRr2vx)",
         )
 
-
 def replaceComplex(program):
     global labelCount
+    global temp
     for x in range(len(program)):
         ins, opcode, label, operandList = (
             program[x],
@@ -351,11 +360,8 @@ def replaceComplex(program):
             program[x].label,
             program[x].operandList,
         )
-        if len(ISA.Instruction_table.get(opcode, [1])) == 1 and cmplx_subs.get(opcode) != None:
+        if ISA.Instruction_table.get(opcode) == None and cmplx_subs.get(opcode) != None:
             if opcode == "CAL":
-                pop = "LOD"
-                psh = "STR"
-                swapped = False
                 operandList = " ".join(operandList)
                 if "$" in operandList:
                     labelName = operandList.split("(")[0] + str(len(operandList.split()))
@@ -368,67 +374,60 @@ def replaceComplex(program):
                     if f"{labelName}" in program[y].label:
                         funcLabelName = program[y].label
                         form = program[y].label.split("(")[1].split("#")[0]
-                        regs = program[y].label.split("#")[1][:-1]
-                        for z in range(y,len(program)):
-                            if program[z].opcode == "RET":
-                                program[z].operandList.append(f"${int(regs)+1}")
-                                break
-                        break
-                insert = []
-                ret_before_name = 0
-                if not ISA.CPU_stats["STR_OVER_PSH"]:
-                    pop = "POP"
-                    psh = "PSH"
-                    swapped = True
-                for y in range(x, len(program)):
-                    if program[y].opcode == "RET":
-                        ret_before_name = 1
-                        break
-                    elif "#" in program[y].label and "(" in program[y].label:
-                        ret_before_name = 2
-                        break
-                if ret_before_name == 1:
-                    ret_before_name = 0
-                    for y in range(x, 0, -1):
-                        if "#" in program[y].label and "(" in program[y].label:
-                            ret_before_name = 1
-                            break
-                        elif program[y].opcode == "RET":
-                            ret_before_name = 2
-                            break
-                    if ret_before_name == 1:
-                        pop = "POP"
-                        psh = "PSH"
-                        swapped = True
-                outs = form.count("o")
-                for y in range(1, int(regs)+2):
-                    if y == 1:l = program[x].label
-                    else:l = ""
-                    if f"${y}" in operands[:outs]:
-                        pass
-                    else:
-                        insert.append(instruction(l, psh, [f"${y}"] if swapped else [f".RES_{y}", f"${y}"]))
-                for y in range(0, len(operands)):
-                    if form[y] == "i":
-                        insert.append(instruction("", "MOV", [f"${y+1}", f"{operands[y]}"]))
-                insert.append(instruction("", "IMM", [f"${int(regs)+1}", f".label__{labelCount}__"]))
-                insert.append(instruction("", "JMP", [funcLabelName]))
-                insert.append(instruction(f".label__{labelCount}__", pop, [f"${int(regs)+1}"] if swapped else [f"${int(regs)+1}", f".RES_{int(regs)+1}"]))
+                        regs = int(program[y].label.split("#")[1][:-1])
+                ret_addr = f".label__{labelCount}__"
                 labelCount += 1
-                for y in range(int(regs),len(form),-1):
-                    insert.append(instruction("",pop,[f"${z}"] if swapped else [f"${z}", f".RES_{z}"]))
-                for y in range(0, len(form)):
-                    if form[y] == "o":
-                        insert.append(instruction("","MOV",[operands[y], f"${y+2}"]))
-                outputs = []
-                for z in range(len(form)):
-                    if form[z] == "o":
-                        outputs.append(operands[z][1:])
-                form = form[::-1]
-                for z in range(0, len(form)):
-                    z = len(form)-z
-                    if not (str(z) in outputs):
-                        insert.append(instruction("",pop,[f"${z}"] if swapped else [f"${z}", f".RES_{z}"]))
+                insert = [instruction(program[x].label, "PSH", [ret_addr])]
+                for y,operand in enumerate(operands):
+                    if form[y] == "i":
+                        insert.append(instruction("", "PSH", [operand]))
+                insert.append(instruction("", "JMP", [funcLabelName]))
+                index = len(insert)
+                for y in range(form.count("o")):
+                    insert.append(instruction("", "POP", [f"${form.count('o')-y}"]))
+                insert.append(instruction("", "ADD", ["SP", "SP", f"{regs + form.count('i') + 1}"]))
+                insert[index].label = ret_addr
+                marker = 0
+                for y in range(len(program)):
+                    if funcLabelName == program[y].label:
+                        insert2 = []
+                        for z in range(regs):
+                            insert2.append(instruction(program[y].label, "PSH", [f"${z+1}"]))
+                            program[y].label = ""
+                        insert2.append(instruction("", "ADD", ["SP", "SP", str(regs)]))
+                        for z in range(form.count("i")):
+                            insert2.append(instruction("", "POP", [f"${len(form)-z}"]))
+                        insert2.append(instruction("", "SUB", ["SP", "SP", str(regs+form.count("i"))]))
+                        program = program[:y] + insert2 + program[y:]
+                        marker = y
+                        break
+                for y in range(marker, len(program)):
+                    if program[y].opcode == "RET":
+                        insert2 = []
+                        for z in range(form.count("o")):
+                            insert2.append(instruction(program[y].label, "PSH", [f"${z+1}"]))
+                            program[y].label = ""
+                        insert2.append(instruction("", "ADD", ["SP", "SP", str(form.count("o"))]))
+                        for z in range(regs):
+                            insert2.append(instruction("", "POP", [f"${regs-z}"]))
+                        insert2.append(instruction("", "ADD", ["SP", "SP", str(form.count("i"))]))
+                        insert2.append(instruction("", "POP", [f"${temp+2}"]))
+                        insert2.append(instruction("", "SUB", ["SP", "SP", str(len(form) + regs + 1)]))
+                        insert2.append(instruction("", "JMP", [f"${temp+2}"]))
+                        program = program[:y] + insert2 + program[y+1:]
+                program = program[:x] + insert + program[x+1:]
+                return False, program
+            elif opcode in ["POP", "PSH"]:
+                if opcode == "PSH":
+                    insert = [
+                        instruction(label, "DEC", ["SP","SP"]),
+                        instruction("", "STR", ["SP",operandList[0]])
+                    ]
+                else:
+                    insert = [
+                        instruction(label, "LOD", [operandList[0],"SP"]),
+                        instruction("", "INC", ["SP","SP"])
+                    ]
                 program = program[:x] + insert + program[x+1:]
                 return False, program
             else:
@@ -455,14 +454,15 @@ def optimise(program):
                     done = False
                     break
             if line.opcode == "MOV":
-                if line.operandList[1][0] != "$":
+                if line.operandList[1][0] != "$" and line.operandList[1] != "SP":
                     program[x].opcode = "IMM"
             if line.opcode == "IMM":
-                if line.operandList[1][0] == "$":
+                if line.operandList[1][0] == "$" or line.operandList[1] == "SP":
                     program[x].opcode = "MOV"
             if line.opcode == "RET" and line.operandList != []:
                 program[x].opcode = "JMP"
     return program
+
 def countPatternLength(segments):
     segments = " ".join(segments)
     segments = "".join(list(filter(lambda a: a not in " _", segments)))
@@ -473,13 +473,22 @@ def fixImmediates(program):
     for x, line in enumerate(program):
         if line.opcode not in JMPnching_ops and line.opcode != "CAL":
             for y, operand in enumerate(line.operandList):
+                if len(operand) > 2:
+                    if operand[0] == "0" and operand[1].isalpha():
+                        program[x].operandList[y] = str(int(operand, 0))
                 if operand[0] == "-":
                     program[x].operandList[y] = str(2**int(ISA.CPU_stats["DATABUS_WIDTH"])-int(operand[1:]))
-                if operand[0] == "#" and operand[1:].isnumeric():
-                    program[x].operandList[y] = program[x].operandList[y][1:]
-                if operand[0] == "M" and operand[1:].isnumeric():
-                    program[x].operandList[y] = program[x].operandList[y][1:]
-                if len(list(filter(lambda a: a in "10()", operand))) == len(operand) and "(" in operand and ")" in operand:
+                if operand[0] == "&":
+                    operand = operand[1:]
+                    if "+" in operand:
+                        operand, c = operand.split("+")
+                        c = int(c)
+                    elif "-" in operand:
+                        operand, c = operand.split("-")
+                        c = int(c)
+                        c *= -1
+                    else:
+                        c = 0
                     bits = int(ISA.CPU_stats["DATABUS_WIDTH"])
                     segments = []
                     pattern = operand.split("(")
@@ -503,11 +512,10 @@ def fixImmediates(program):
                                     break
                     segments = " ".join(segments)
                     segments = "".join(list(filter(lambda a: a not in " _", segments)))
-                    program[x].operandList[y] = str(int(segments, 2))
+                    program[x].operandList[y] = str(int(segments, 2) + c)
                 else:
                     pass
     return program
-
 
 def convertToISA(program):
     ISAprogram = []
@@ -525,7 +533,6 @@ def convertToISA(program):
         ISAprogram += ISAsnippet
     return ISAprogram
 
-
 def removeISALabels(program):
     for x in range(len(program)):
         if "%__." in program[x]:
@@ -540,8 +547,15 @@ def readHeaders(program):
     global RUNRAM
     global MINREG
     global MINRAM
-
+    global spisreg
+    global fixSP
+    global usestacknotreg
+    global databuswidth
+    spisreg = ISA.CPU_stats['SP_IS_REG']
+    usestacknotreg = False
+    fixSP = not ISA.CPU_stats['MANUAL_SP_REMOVAL']
     BITS = ISA.CPU_stats['DATABUS_WIDTH']
+    databuswidth = int(BITS)
     RUNRAM = ISA.CPU_stats["RUN_RAM"]
     done = False
     while not done:
@@ -681,7 +695,10 @@ def allocateReservedRAM(program):
                 operandLists.append(line.operandList)
             for lst in operandLists:
                 for item in lst:
-                    if item[:5] == ".RES_" and item not in labels:
+                    if item == ".STACK_PTR" and item not in labels:
+                        program.append(instruction(item,"DW",[f"{ISA.CPU_stats['SP_LOCATION']}"]))
+                        labels.append(item)
+                    elif item[:5] == ".RES_" and item not in labels:
                         if int(item[5:]) > maxRes:
                             maxRes = int(item[5:])
                         program.append(instruction(item,"DW",["0"]))
@@ -693,96 +710,309 @@ def allocateReservedRAM(program):
                         if int(operand[5:]) > maxRes:
                             maxRes = int(operand[5:])
                         program[x].operandList[y] = f"#{MINRAM+int(operand[5:])}"
+                    if operand == ".STACK_PTR":
+                        program[x].operandList[y] = f"{ISA.CPU_stats['SP_LOCATION']}"
+                        subflag = False
+                        for subline in program:
+                            if subline.opcode == "STR" and subline.operandList == [f"{ISA.CPU_stats['SP_LOCATION']}", f"{ISA.CPU_stats['SP_LOCATION']}"]:
+                                subflag = True
+                                break
+                        if not subflag:
+                            program.append(instruction("", "STR", [f"{ISA.CPU_stats['SP_LOCATION']}", f"{ISA.CPU_stats['SP_LOCATION']}"]))
     return program
 
 def regSubstitution(program):
-    global maxRes
-    blocked = ["IMM", "LOD", "CAL"]
-    done = False
+  global maxRes
+  global usestacknotreg
+  global temp
+  blocked = ["IMM", "CAL", "DW"]
+  for opcode in ISA.Instruction_table:
+      if not ISA.Instruction_table.get(opcode, [True])[0]:
+          blocked.append(opcode)
+  done = False
+  if usestacknotreg:
+    blocked = blocked + JMPnching_ops
     while not done:
-        done = True
-        for x, line in enumerate(program):
-            label = line.label
-            if ISA.Instruction_table.get(line.opcode, [True])[0] and line.opcode not in blocked:
-                offenders = []
-                for y, operand in enumerate(line.operandList):
-                    if operand[0] != "$" and operand[0] not in offenders and y > 0:
-                        offenders.append(operand)
-                if len(offenders) == 0:
-                    continue
-                program[x].label = ""
-                insert = []
-                originalMaxRes = maxRes
-                buffer = 0
-                temp = []
-                for y,offender in enumerate(offenders):
-                    while ((f"${y+1}" == line.operandList[0] and operands[line.opcode] < 2)) and f"${y+1+buffer}" in line.operandList:
-                        buffer += 1
-                    insert.append(instruction(label, "STR", [f".RES_{maxRes+y+1}", f"${y+1+buffer}"]))
-                    insert.append(instruction("", "IMM", [f"${y+1+buffer}", offender]))
-                    temp.append(f"${y+1+buffer}")
-                    for z, item in enumerate(line.operandList):
-                        if offender == item:
-                            program[x].operandList[z] = f"${y+1+buffer}"
-                    maxRes += 1
-                    label = ""
-                insert.append(program[x])
-                for t in temp:
-                    if t != line.operandList[0] or (t == line.operandList[0] and operands[line.opcode] < 2):
-                        insert.append(instruction("", "LOD", [t, f".RES_{originalMaxRes+y+1}"]))
-                program = program[:x] + insert + program[x+1:]
-                done = False
-                maxRes = originalMaxRes
-                break
-    return program
+      done = True
+      for x, line in enumerate(program):
+        if line.opcode in blocked:
+          continue
+        label = line.label
+        offenders = []
+        for y, operand in enumerate(line.operandList):
+          if operand[0] != "$" and operand != "SP" and operand not in offenders:
+            if line.opcode == "LOD" and y == 1:
+              ex = True
+              continue
+            elif line.opcode == "STR" and y == 0:
+              ex = True
+              continue
+            else:
+              offenders.append(operand)
+        if len(offenders) == 0:
+          continue
+        program[x].label = ""
+        insert = []
+        originalMaxRes = maxRes
+        buffer = 0
+        temp = []
+        pushed = []
+        for y,offender in enumerate(offenders):
+          while (f"${y+1+buffer}" in line.operandList):
+            buffer += 1
+          insert.append(instruction(label, "PSH", [f"${y+1+buffer}"]))
+          pushed.append(f"${y+1+buffer}")
+          insert.append(instruction("", "IMM", [f"${y+1+buffer}", offender]))
+          temp.append(f"${y+1+buffer}")
+          for z, item in enumerate(line.operandList):
+            if offender == item:
+              program[x].operandList[z] = f"${y+1+buffer}"
+          maxRes += 1
+          label = ""
+        insert.append(program[x])
+        temp.reverse()
+        for t in temp:
+          if t in pushed:
+            insert.append(instruction("", "POP", [t]))
+        program = program[:x] + insert + program[x+1:]
+        done = False
+        maxRes = originalMaxRes
+        break
+  else:
+    if temp == 0:
+        maxReg = 0
+        for line in program:
+            if line.opcode == "CAL":
+                continue
+            for operand in line.operandList:
+                if operand[0] == "$":
+                    if int(operand[1:]) > maxReg:
+                        maxReg = int(operand[1:])
+        temp = maxReg
+    maxReg = temp
+    while not done:
+      done = True
+      for x, line in enumerate(program):
+        if line.opcode in blocked:
+          continue
+        label = line.label
+        used = 1
+        offenders = {}
+        for y, operand in enumerate(line.operandList):
+          if operand[0] != "$" and operand != "SP" and offenders.get(operand, None) == None:
+            if line.opcode == "LOD" and y == 1:
+              continue
+            elif line.opcode == "STR" and y == 0:
+              continue
+            else:
+              offenders[operand] = maxReg + used
+            used += 1
+        if len(offenders) == 0:
+          continue
+        line.label = ""
+        insert = []
+        for y,key in enumerate(offenders):
+          insert.append(instruction(label, "IMM", [f"${offenders[key]}", f"{key}"]))
+          label = ""
+        for y, operand in enumerate(line.operandList):
+          if operand[0] != "$" and operand != "SP":
+            line.operandList[y] = f"${offenders[line.operandList[y]]}"
+        insert.append(line)
+        program = program[:x] + insert + program[x+1:]
+        done = False
+        break
+  return program
 
 def fixStackPointer(program):
-    # TODO: The stack pointer is either a register
-    #       or in memory. Find out which and put it in
-    #       an unused register somehow.
+  global maxRes
+  global SPreg
+  global spisreg
+  global fixSP
+  done = False
+  if spisreg:
+    if fixSP:
+        if SPreg == 0:
+            maxReg = 0
+            for line in program:
+                if line.opcode == "CAL":
+                    continue
+                for operand in line.operandList:
+                    if operand[0] == "$":
+                        if int(operand[1:]) > maxReg:
+                            maxReg = int(operand[1:])
+            SPreg = maxReg
+        for x, line in enumerate(program):
+            for y, operand in enumerate(line.operandList):
+                if operand == "SP":
+                    program[x].operandList[y] = f"${SPreg+1}"
+  else:
+    while not done:
+      done = True
+      for x, line in enumerate(program):
+        label = line.label
+        if "SP" not in line.operandList:
+          continue
+        regs = []
+        for y, operand in enumerate(line.operandList):
+          if operand != "SP":
+            regs.append(operand)
+        chosen = 0
+        for y in range(1, 100):
+          if f"${y}" not in regs:
+            chosen = y
+            break
+        insert = []
+        insert.append(instruction(label, "STR", [f".RES_1", f"${chosen}"]))
+        insert.append(instruction("", "LOD", [f"${chosen}", f".STACK_PTR"]))
+        for y, operand in enumerate(line.operandList):
+          if operand == "SP":
+            line.operandList[y] = f"${chosen}"
+        line.label = ""
+        insert.append(line)
+        insert.append(instruction("", "STR", [f".STACK_PTR", f"${chosen}"]))
+        insert.append(instruction("", "LOD", [f"${chosen}", f".RES_1"]))
+        program = program[:x] + insert + program[x+1:]
+        done = False
+        break
+  return program
+
+def setupStack(program):
+  if not ISA.CPU_stats["SP_IS_REG"]:
+    insert = [
+      instruction("", "IMM", ["$1", str(ISA.CPU_stats["STACK_START"])]),
+      instruction("", "STR", [".STACK_PTR", "$1"])
+      ]
+  else:
+    insert = [
+      instruction("", "IMM", ["SP", str(ISA.CPU_stats["STACK_START"])])
+    ]
+  program = insert + program
+  return program
+
+def flipStack(program):
+    if ISA.CPU_stats["FLIPPED_STACK"]:
+        SP_operators = ["INC","ADD","SUB","DEC"]
+        for x, ins in enumerate(program):
+            if ins.opcode in SP_operators and "SP" in ins.operandList:
+                program[x].opcode = SP_operators[(~ SP_operators.index(ins.opcode)) & 3]
+    return program
+
+def shiftRAM(program):
+    length = ISA.getProgramLength(program)
+    for x,line in enumerate(program):
+        line = line.split()
+        for y,word in enumerate(line):
+            if word[0] == "#":
+                if word[1:].isnumeric():
+                    line[y] = str(int(word[1:]) + length)
+                elif word[1:-1].isnumeric():
+                    line[y] = str(int(word[1:-1]) + length) + word[-1]
+        program[x] = " ".join(line)
+    return program
+
+def shiftFunctionRAM(program):
+    global MINRAM
+    shift = False
+    for x, ins in enumerate(program):
+        if "#" in ins.label and ")" in ins.label:
+            shift = True
+        if ins.opcode == "RET":
+            shift = False
+        if shift:
+            for y, operand in enumerate(program[x].operandList):
+                if operand[0] == "#" and operand[1:].isnumeric():
+                    program[x].operandList[y] = f"#{int(operand[1:]) + MINRAM}"
     return program
 
 def main():
     global operands
     global RUNRAM
-    program, done = importProgram(input("File to compile? (with extension) ")), False
+    if len(s.argv) > 2: program, done = importProgram(s.argv[2]), False
+    else: program, done = importProgram(input("File to compile? (with extension) ")), False
     program = removeComments(program)
     program = convertToInstructions(program)
-    try:
-        program = ISA.RawURCL(program)
-    except Exception as ex: 
-        end(ex,"- no suggestions, problem with ISA designer's raw URCL tweaks. Report this to them if necessary.")
+    try: program = ISA.RawURCL(program)
+    except Exception as ex: end(ex,"- no suggestions, problem with ISA designer's raw URCL tweaks. Report this to them if necessary.")
     program = fixImmediates(program)
     program = fixLabels(program)
     program = readHeaders(program)
+    if not spisreg: program = fixStackPointer(program)
+    for ins in program:
+      if ins.opcode in ["PSH","POP","CAL"] or "SP" in ins.operandList:
+          program = setupStack(program)
+          break
     program = importLibs(program)
     program = reduceLibs(program)
+    program = fixLabels(program)
+    program = fixImmediates(program)
+    program = optimise(program)
+    program = regSubstitution(program)
+    program = shiftFunctionRAM(program)
     while not done:
         done, program = replaceComplex(program)
-        program = allocateReservedRAM(program)
+        if not spisreg: program = fixStackPointer(program)
         program = fixLabels(program)
-    try: program = ISA.CleanURCL(program)
-    except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's clean URCL tweaks. Report this to them if necessary.",)
-    program = optimise(program)
-    program = fixImmediates(program)
-    program = regSubstitution(program)
-    program = allocateReservedRAM(program)
+        program = fixImmediates(program)
+        program = optimise(program)
+        program = allocateReservedRAM(program)
+        program = regSubstitution(program)
+        done, program = replaceComplex(program)
     program = fixStackPointer(program)
-    [print(f"\nURCL code:\n{ins.label:>25} {ins.opcode:<7} {', '.join(ins.operandList)}") if x == 0 else print(f"{ins.label:>25} {ins.opcode:<7} {', '.join(ins.operandList)}")for x, ins in enumerate(program)]
+    program = flipStack(program)
+    try: program = ISA.CleanURCL(program)
+    except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's clean URCL tweaks. Report this to them if necessary.")
+    max_y = os.get_terminal_size().lines
+    maxlen = 0
+    for ins in program:
+        if len(ins.label) > maxlen:
+            maxlen = len(ins.label)
+    print(f"\nURCL code:")
+    for x, ins in enumerate(program):
+        print(f"{ins.label:>{maxlen}} {ins.opcode:<7} {', '.join(ins.operandList)}")
+        if x > (max_y//2) - 9:
+            print(f"{'':>{maxlen}} ... ({len(program)-1-x} more lines)")
+            break
+    filename = "URCL_output.urcl"
+    if len(s.argv) > 4:
+        filename = s.argv[4]
+    outfile = open(filename, "w+")
+    for ins in program:
+        if ins.label != "":
+            outfile.write(ins.label + "\n")
+        outfile.write(f"{ins.opcode} {', '.join(ins.operandList)}\n")
+    outfile.close()
+    print(f"URCL code dumped in: {filename}")
+    if ISA.__name__ == "ISA_configs.Emulate":
+        return
     try:program = convertToISA(program)
     except Exception as ex:end(ex,"- try checking:\n1. Are all the instructions correctly implemented in the ISA's config file? (It is likely that a basic instruction is missing)\n2. Is there a bug in the URCL program, such as JMPnching past the end?",)
     try:program = ISA.LabelISA(program)
     except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's labelled ISA tweaks. Report this to them if necessary.",)
     if not ISA.CPU_stats["MANUAL_LABEL_REMOVAL"]:program = removeISALabels(program)
     else:program = ISA.RemoveLabels(program)
-    if ISA.CPU_stats["LINENUMS"]:program = [(str(x).zfill(3) + ": " + line) for x, line in enumerate(program)]
     try:program = ISA.FinalISA(program)
     except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's final ISA tweaks. Report this to them if necessary.",)
-    [print(f"\n{ISA.__name__} code:\n{line}") if x == 0 else print(line) for x, line in enumerate(program)]
-
-
+    program = shiftRAM(program)
+    print(f"\n{ISA.__name__} code:")
+    for x, line in enumerate(program):
+        print(f"{'':>{maxlen}} {line}")
+        if x > (max_y//2) - 9:
+            print(f"{'':>{maxlen}} ... ({len(program)-1-x} more lines)")
+            break
+    filename = f"{ISA.__name__}_output.txt"
+    if len(s.argv) > 3:
+        filename = s.argv[3]
+    outfile = open(filename, "w+")
+    for line in program:
+        outfile.write(line + "\n")
+    outfile.close()
+    print(f"{ISA.__name__} code dumped in: {filename}")
+    return
 if __name__ == "__main__":
-    try:
-        exec(f"import {input('Compile to which ISA? (without extension) ')} as ISA")
-    except Exception as ex:end(ex,"- try checking:\n1. Is it in a different folder to URCL.py?\n2. Are you running URCL.py from elsewhere?",)
+    if len(s.argv) > 1:
+        exec(f"import ISA_configs.{s.argv[1]} as ISA")
+    else:
+        try:
+            exec(f"import ISA_configs.{input('Compile to which ISA? (without extension) ')} as ISA")
+        except Exception as ex:end(ex,"- try checking:\n1. Is it in a different folder to URCL.py?\n2. Are you running URCL.py from elsewhere?",)
     main()

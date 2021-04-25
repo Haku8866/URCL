@@ -6,6 +6,24 @@ URCL compiles to a specified ISA using a Python config file.
 The URCL documentation can be found here: https://docs.google.com/spreadsheets/d/14u15VlSYORlt8EQu3C0ow0LTppoeio9gm2_z0Q4bOD8/edit?usp=sharing
 Documentation for the beta version: https://docs.google.com/spreadsheets/d/1YAVlzYkib-YHJEu_x28qC4iXJDnM_YTvCKMBYrJXIT0
 
+# Usage
+To run the file via the command line, you can do:
+```
+py URCL.py <myISA> <programName.urcl> <ISAoutput.txt> <URCLoutput.urcl>
+```
+You may also exclude parameters from right to left, so you can have a custom ISA output file without a custom URCL output for example.
+You may also run the file without any parameters by simply entering:
+```
+py URCL.py
+```
+Additionally, you can use the special `Emulate` ISA to just use the URCL-simplification feature.
+The resulting code can be used with the included `URCL_Emulator.py`, which allows you to test the URCL program to find any bugs.
+```
+py URCL_emulator.py <bits> <URCLoutput.urcl>
+```
+The `<bits>` parameter is optional, as is `<URCLoutput.urcl>`.
+As with URCL.py, you cannot have `<URCLoutput.urcl>` without specifying `<bits>`.
+
 # What it does
 You can think of this is a framework to help you easily compile URCL to your ISA without starting from the ground up.
 It does the vast majority of the work, and only leaves you to do CPU-specific parts.
