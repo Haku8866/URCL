@@ -34,7 +34,7 @@ Here's a list of things the compiler does for you:
  . Expands function calls, ensuring register preservation.
  . Optimises the URCL code where possible, using memory instead of the stack in some cases.
 
-# How to get URCL -> <your ISA> compiler working
+# How to get a URCL -> your ISA compiler working
 There's an ExampleISA.py config file provided, this is roughly what a config file will look like, based off my own HPU4 instruction set.
 There is also a Template.py config file provided, this is a blank config file ready to be filled in.
 Here's a list of things you need to do to support URCL:
