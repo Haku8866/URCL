@@ -800,12 +800,7 @@ def regSubstitution(program):
         offenders = {}
         for y, operand in enumerate(line.operandList):
           if operand[0] != "$" and operand != "SP" and offenders.get(operand, None) == None:
-            if line.opcode == "LOD" and y == 1:
-              continue
-            elif line.opcode == "STR" and y == 0:
-              continue
-            else:
-              offenders[operand] = maxReg + used
+            offenders[operand] = maxReg + used
             used += 1
         if len(offenders) == 0:
           continue
@@ -959,7 +954,7 @@ def main():
         done, program = replaceComplex(program)
     program = fixStackPointer(program)
     program = flipStack(program)
-    try: program = ISA.CleanURCL(program)
+    try: program, operands = ISA.CleanURCL(program, operands)
     except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's clean URCL tweaks. Report this to them if necessary.")
     max_y = os.get_terminal_size().lines
     maxlen = 0

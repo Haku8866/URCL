@@ -48,8 +48,8 @@ def getProgramLength(code):
     return 0
 def RawURCL(code):
     return code
-def CleanURCL(code):
-    return code
+def CleanURCL(code, instructions):
+    return code, instructions
 def LabelISA(code):
     return code
 def FinalISA(code):

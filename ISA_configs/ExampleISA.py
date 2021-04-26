@@ -118,7 +118,7 @@ def RawURCL(code):
 
 # Clean URCL, all branches are now labels. Safe to add and remove instructions.
 # For example, you might want to trim any NOPs:
-def CleanURCL(code):
+def CleanURCL(code, instructions):
     done = False
     while not done:
         done = True
@@ -130,7 +130,7 @@ def CleanURCL(code):
                 code.pop(i)  # After changing the length of the list, it's a good idea to go back to the beginning and iterate through again.
                 done = False # Iterating through the list as it changes length is a bad idea.
                 break
-    return code
+    return code, instructions
 
 # This is your ISA code with labels, there are no relative branches so you can add new ISA instructions in here.
 # These do not use instruction objects, instead, strings are used. You can use list = str.split() and str = " ".join(list) to manipulate code.
