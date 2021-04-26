@@ -95,6 +95,7 @@ def getState(program_input, databuswidth):
   STACK = ["-" for x in range(10)]
   REG = ["-" for x in range(BITS)]
   LABEL = {}
+  reverseLABEL = {}
   FLAG = {
     "CF": False,
     "ZF": False,
@@ -109,6 +110,7 @@ def getState(program_input, databuswidth):
   for x,ins in enumerate(program):
     if LABEL.get(ins.label, None) == None:
       LABEL[ins.label] = x
+      reverseLABEL[x] = ins.label
     if ins.opcode not in ["DW"]:
       RAM.append("-")
     else:
@@ -156,7 +158,7 @@ def getState(program_input, databuswidth):
       if addr < len(RAM) or (abs(addr-len(RAM)) <= abs(addr-(maxaddr-len(STACK)))):
         while addr >= len(RAM):
           RAM.append("-")
-        REG[int(operands[0][1:])] = RAM[addr]
+        REG[int(operands[0][1:])] = int(RAM[addr])
       else:
         addr = maxaddr - addr
         while addr >= len(STACK):
@@ -252,11 +254,11 @@ def getState(program_input, databuswidth):
     flg0 = False
     mcnt = 0
     for x,val in enumerate(RAM):
-      lbl = LABEL.get(x, "")
+      lbl = reverseLABEL.get(x, "")
       if val != "-":
         flg0 = True
         mcnt += 1
-        columns[0].append(f"├ {x:>{maxwidth}}: {val} (.{lbl})" if lbl else f"├ {x:>{maxwidth}}: {val}")
+        columns[0].append(f"├ {x:>{maxwidth}}: {val} ({lbl})" if lbl else f"├ {x:>{maxwidth}}: {val}")
     if flg0:
       columns[0].append(f"├ {'...':>{maxwidth}}")
     STACK.reverse()
@@ -296,8 +298,8 @@ def getState(program_input, databuswidth):
     for x in range(highest):
       output = ""
       for y in range(len(columns)):
-        try: output += f"{columns[y][x]:<15}"
-        except: pass
+        try: output += f"{columns[y][x]:<30}"
+        except: output += f"{' ':<30}"
       print(output)
   return state
 
