@@ -35,8 +35,8 @@ Instruction_table = {
     "NAND":  [True, "AND <A>, <B>", "NOT <A>"],
     "XNOR":  [True, "XOR <A>, <B>", "NOT <A>"],
     "NOT":   [True, "NOT <A>"],
-    "IMM":   [False, "IMM <B>", "MOV <A>, MDR"], # IMM cannot accept a register
-    "LOD":   [False, "LDA <B>", "MOV <A>, MDR"], # LOD cannot accept a register
+    "IMM":   [True, "IMM <B>", "MOV <A>, MDR"], # IMM cannot accept a register
+    "LOD":   [True, "LDA <B>", "MOV <A>, MDR"], # LOD cannot accept a register
     "STR":   [True, "MOV MDR, <B>", "STR <A>"],
     "JMP":   [True, "JMP <A>"],
     "BRC":   [True, "JMP <A> if C"],
@@ -53,8 +53,8 @@ Instruction_table = {
     # PSH and POP are very important and don't have core translations yet.
     "PSH":   [True, "LDA .stack_ptr", "STR .next+1", "MOV MDR, <A>", ".next", "STR 0", "LDA .stack_ptr", "INC MDR", "STR .stack_ptr"],
     "POP":   [True, "LDA .stack_ptr", "DEC MDR", "STR .stack_ptr","LDA .stack_ptr", "STR .next+1", ".next", "LDA 0", "MOV <A>, MDR"],  
-    "IN":    [False, "IN <A>, <B>"], # IN cannot accept a register
-    "OUT":   [True, "OUT <A>, <B>"],
+    "IN":    [True, "IN <A>, <B>"], # <B> will be an immediate (port)
+    "OUT":   [True, "OUT <A>, <B>"], # <A> will be an immediate (port)
 
     # You can support extra complex instructions natively if you would like to make the resulting ISA code more efficient.
     # Note that the special CAL instruction will always be handled by the compiler.

@@ -46,7 +46,7 @@ def removeComments(program):
         line[x] = "$" + line[x][1:]
       if len(line[x]) >= 2 and line[x][0] == "M" and line[x][1].isnumeric():
         line[x] = "#" + line[x][1:]
-      line[x] = "".join(list(filter(lambda a: (a in " _.-+=*<()>$#" or a.isnumeric() or a.isalpha()), line[x])))
+      line[x] = "".join(list(filter(lambda a: (a in " _.-+=*<()>$#%" or a.isnumeric() or a.isalpha()), line[x])))
     program[y] = " ".join(line)
   return list(filter(None, program))
 
@@ -72,7 +72,7 @@ def updateFlags(reg):
   global REG
   global BITS
   val = REG[reg]
-  if val >= 2**(BITS) or val < 0:FLAG["CF"] = True
+  if val >= 2**(BITS): FLAG["CF"] = True
   else: FLAG["CF"] = False
   val = (val + 2**BITS) % (2**BITS)
   if val >= 2**(BITS-1): FLAG["NF"] = True
@@ -95,6 +95,13 @@ def getState(program_input, databuswidth):
   STACK = ["-" for x in range(10)]
   REG = ["-" for x in range(BITS)]
   LABEL = {}
+  OUTPUT = []
+
+  PIX_DISPLAY_X = 0
+  PIX_DISPLAY_Y = 0
+
+  PIX_DISPLAY = [["  " for x in range(0, 16)] for y in range(0, 16)]
+
   reverseLABEL = {}
   FLAG = {
     "CF": False,
@@ -119,6 +126,11 @@ def getState(program_input, databuswidth):
       if operand[0] == "#":
         program[x].operandList[y] = str(int(operand[1:]) + offset)
   colorama.init()
+  step = False
+  try:
+    if "-step" in s.argv: step = True
+  except:
+    step = False
   while True:
     if REG[0] not in ["0", 0]:
       REG[0] = 0
@@ -168,13 +180,13 @@ def getState(program_input, databuswidth):
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + 1
       updateFlags(int(operands[0][1:]))
     elif opcode == "DEC":
-      REG[int(operands[0][1:])] = REG[int(operands[1][1:])] - 1
+      REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + (~1 % 2**(BITS))+1
       updateFlags(int(operands[0][1:]))
     elif opcode == "ADD":
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + REG[int(operands[2][1:])]
       updateFlags(int(operands[0][1:]))
     elif opcode == "SUB":
-      REG[int(operands[0][1:])] = REG[int(operands[1][1:])] - REG[int(operands[2][1:])]
+      REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + (~REG[int(operands[2][1:])] % 2**(BITS))+1
       updateFlags(int(operands[0][1:]))
     elif opcode == "JMP":
       if operands[0][0] == "$":
@@ -199,16 +211,39 @@ def getState(program_input, databuswidth):
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] | REG[int(operands[2][1:])]
       updateFlags(int(operands[0][1:]))
     elif opcode == "NOR":
-      REG[int(operands[0][1:])] = ~(REG[int(operands[1][1:])] | REG[int(operands[2][1:])])
+      REG[int(operands[0][1:])] = ~(REG[int(operands[1][1:])] | REG[int(operands[2][1:])]) % 2**(BITS)
       updateFlags(int(operands[0][1:]))
     elif opcode == "NAND":
-      REG[int(operands[0][1:])] = ~(REG[int(operands[1][1:])] & REG[int(operands[2][1:])])
+      REG[int(operands[0][1:])] = ~(REG[int(operands[1][1:])] & REG[int(operands[2][1:])]) % 2**(BITS)
       updateFlags(int(operands[0][1:]))
     elif opcode == "XNOR":
-      REG[int(operands[0][1:])] = ~(REG[int(operands[1][1:])] | REG[int(operands[2][1:])])
+      REG[int(operands[0][1:])] = ~(REG[int(operands[1][1:])] | REG[int(operands[2][1:])]) % 2**(BITS)
       updateFlags(int(operands[0][1:]))
     elif opcode == "MOV":
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])]
+    elif opcode == "NOT":
+      REG[int(operands[0][1:])] = ~REG[int(operands[1][1:])] % 2**(BITS)
+    elif opcode == "IN":
+      try:
+        REG[int(operands[0][1:])] = int(input(f"IN (num between 0 and {2**BITS-1}): "))
+      except:
+        REG[int(operands[0][1:])] = 0
+    elif opcode == "OUT":
+      if operands[0] == "%NUMB":
+        OUTPUT.append(REG[int(operands[1][1:])])
+      elif operands[0] == "%TEXT":
+        OUTPUT.append(chr(REG[int(operands[1][1:])]))
+      elif operands[0] == "%X":
+        PIX_DISPLAY_X = REG[int(operands[1][1:])]
+      elif operands[0] == "%Y":
+        PIX_DISPLAY_Y = REG[int(operands[1][1:])]
+      elif operands[0] == "%COLOR" or operands[0] == "%COLOUR":
+        draw = "  "
+        if REG[int(operands[1][1:])] != 0:
+          draw = "##"
+        PIX_DISPLAY[PIX_DISPLAY_Y][PIX_DISPLAY_X] = draw
+      else:
+        OUTPUT.append(REG[int(operands[1][1:])])
     elif opcode == "BRC":
       if FLAG["CF"]:
         if operands[0][0] == "$":
@@ -259,6 +294,9 @@ def getState(program_input, databuswidth):
         flg0 = True
         mcnt += 1
         columns[0].append(f"├ {x:>{maxwidth}}: {val} ({lbl})" if lbl else f"├ {x:>{maxwidth}}: {val}")
+      if mcnt > 17:
+        columns[0].append(f"├ (approx. {len(RAM)-x} more values)")
+        break
     if flg0:
       columns[0].append(f"├ {'...':>{maxwidth}}")
     STACK.reverse()
@@ -273,7 +311,7 @@ def getState(program_input, databuswidth):
     if not flg1:
       columns[0].append(f"├ {'(all empty)':>{maxwidth}}")
     STACK.reverse()
-    columns[1].append("    - Registers")
+    columns[1].append("      - Registers")
     flg2 = False
     rcnt = 0
     maxwidth = len(str(BITS))
@@ -284,16 +322,33 @@ def getState(program_input, databuswidth):
         columns[1].append(f"├ {x:>{maxwidth}}: {val}")
     if not flg2:
       columns[1].append(f"├ {'(all empty)':>{maxwidth}}")
-    columns[2].append(f"    - Flags")
+    columns[2].append(f"      - Flags")
     columns[2].append(f"├ CF : ON" if FLAG["CF"] else "├ CF : OFF")
     columns[2].append(f"├ ZF : ON" if FLAG["ZF"] else "├ ZF : OFF")
     columns[2].append(f"├ OF : ON" if FLAG["OF"] else "├ OF : OFF")
     columns[2].append(f"├ NF : ON" if FLAG["NF"] else "├ NF : OFF")
-    columns[3].append(f"    - Headers")
-    columns[3].append(f"├ MINREG: {rcnt}")
-    columns[3].append(f"├ MINRAM: {mcnt}")
-    columns[3].append(f"├ MINSTK: {scnt}")
-    columns[4].append(f"    - Runtime: {cycles} clock cycles")
+    columns[2].append("")
+    columns[2].append(f"- Headers")
+    columns[2].append(f"├ MINREG: {rcnt}")
+    columns[2].append(f"├ MINRAM: {mcnt}")
+    columns[2].append(f"├ MINSTK: {scnt}")
+    columns[2].append("")
+    columns[2].append(f"- Executing")
+    columns[2].append(f"├ {PC}: {opcode} {', '.join(operands)}")
+    columns[3].append(f"      - Runtime: {cycles} clock cycles")
+    columns[3].append("")
+    columns[3].append(f"Display X: {PIX_DISPLAY_X}")
+    columns[3].append(f"Display Y: {PIX_DISPLAY_Y}")
+    columns[3].append("")
+    for row in PIX_DISPLAY:
+      columns[3].append("".join(row))
+    columns[1].append("")
+    columns[1].append(f"- Output")
+    offset = 0
+    if len(OUTPUT) > 10:
+      offset = len(OUTPUT)-10
+    for x in range(offset, len(OUTPUT)):
+      columns[1].append(f"├ {OUTPUT[x]}")
     highest = max([len(z) for z in columns])
     for x in range(highest):
       output = ""
@@ -301,6 +356,8 @@ def getState(program_input, databuswidth):
         try: output += f"{columns[y][x]:<30}"
         except: output += f"{' ':<30}"
       print(output)
+    if step:
+      input()
   return state
 
 def main():
@@ -328,7 +385,7 @@ def main():
     if ex.__class__ is TypeError:
       print(f"Null reference exception! You're either:\n - 1) Using a register that hasn't been loaded with an IMM <reg> <val> instruction.\n - 2) Loading a value from memory that hasn't been set with a STR <addr> <val/reg> instruction.\nVariables need to be set before being used, as the CPU won't set everything to 0 before running your program.")
     elif ex.__class__ is IndexError:
-      print(f"Index out of bounds error! You're either:\n - 1) Using too many registers (this CPU only has {databuswidth}), try using some memory instead.zn - 2) Using too much memory (this CPU only has {2**BITS} words), try making your program more efficient, or target {databuswidth*2} bit CPUs instead.")
+      print(f"Index out of bounds error! You're either:\n - 1) Using too many registers (this CPU only has {databuswidth}), try using some memory instead.\n - 2) Using too much memory (this CPU only has {2**BITS} words), try making your program more efficient, or target {databuswidth*2} bit CPUs instead.")
     else:
       print(ex)
 if __name__ == "__main__":

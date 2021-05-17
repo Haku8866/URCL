@@ -25,8 +25,8 @@ Instruction_table = {
     "NAND":  [True, ""],
     "XNOR":  [True, ""],
     "NOT":   [True, ""],
-    "IMM":   [False, ""], # IMM cannot accept a register
-    "LOD":   [False, ""], # LOD cannot accept a register
+    "IMM":   [True, ""], # <B> will be an immediate
+    "LOD":   [True, ""],
     "STR":   [True, ""],
     "JMP":   [True, ""],
     "BRC":   [True, ""],
@@ -38,8 +38,8 @@ Instruction_table = {
     "NOP":   [True, ""],
     "HLT":   [True, ""],
     "DW":    [True, ""], # Only for RUN RAM
-    "IN":    [False, ""], # IN cannot accept a register
-    "OUT":   [True, ""],
+    "IN":    [True, ""], # <B> will be an immediate (port)
+    "OUT":   [True, ""], # <A> will be an immediate (port)
     }
 from URCL import instruction
 def RemoveLabels(code):

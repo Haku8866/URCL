@@ -1,269 +1,42 @@
 import sys as s
 import os
 import copy
-end = (
-    lambda ex, tag: input(f"\n--- Something went wrong :( ---\n\n{ex} {tag}\n")
-    and s.exit()
-)
+from globalObjects import *
 
+end = (lambda ex, tag: input(f"\n--- Something went wrong :( ---\n\n{ex} {tag}\n") and s.exit())
 
-class instruction:
-    def __init__(self, label, opcode, operandList):
-        self.label, self.opcode, self.operandList = label, opcode, operandList
-
-
-labelCount, regUsage, ramUsage = 0, [], []
-
-maxRes = 0
-SPreg = 0
-fixSP = True
-spisreg = True
-usestacknotreg = False
-temp = 0
-MINRAM = 0
-MINREG = 0
-BITS = ("", 0)
-RUNRAM = False
-IMPORTS = []
-IMPORTED = []
-
-operands = {
-    "NEG": 2,
-    "DW": 1,
-    "DD": 1,
-    "DQ": 1,
-    "ADD": 3,
-    "SUB": 3,
-    "BSR": 3,
-    "BSL": 3,
-    "ADC": 3,
-    "SBB": 3,
-    "INC": 2,
-    "DEC": 2,
-    "MOV": 2,
-    "IMM": 2,
-    "XOR": 3,
-    "AND": 3,
-    "OR": 3,
-    "NOR": 3,
-    "NAND": 3,
-    "XNOR": 3,
-    "NOT": 2,
-    "LOD": 2,
-    "STR": 2,
-    "JMP": 1,
-    "BRC": 1,
-    "BNC": 1,
-    "BRZ": 1,
-    "BNZ": 1,
-    "BRN": 1,
-    "BRP": 1,
-    "BZR": 2,
-    "BZN": 2,
-    "NOP": 0,
-    "HLT": 0,
-    "MLT": 3,
-    "DIV": 3,
-    "MOD": 3,
-    "SQRT": 2,
-    "CAL": 1,
-    "RET": 0,
-    "PSH": 1,
-    "POP": 1,
-    "BRL": 3,
-    "BRG": 3,
-    "BRE": 3,
-    "BNE": 3,
-    "IN": 2,
-    "OUT": 2,
-    "BOD": 2,
-    "BEV": 2,
-    "RSH": 2,
-    "LSH": 2,
-    "CMP": 2,
-    "SRS": 3,
-    "BSS": 3,
-    "BLE": 3,
-    "BGE": 3,
-    "BITS": 2,
-    "MINREG": 1,
-    "RUN": 1,
-    "MINRAM": 1,
-    "IMPORT": 0,
-    "NAME": 1,
-    "OPS": 1,
-    "REG": 1,
-    "IN": 1,
-    "SETE": 3,
-    "SETNE": 3,
-    "SETG": 3,
-    "SETL": 3,
-    "SETGE": 3,
-    "SETLE": 3,
-}
-JMPnching_ops = [
-    "BRP",
-    "BRN",
-    "BNZ",
-    "BRZ",
-    "BNC",
-    "BRC",
-    "JMP",
-    "BRL",
-    "BRG",
-    "BRE",
-    "BNE",
-    "BEV",
-    "BOD",
-    "BGE",
-    "BLE",
-    "BZR",
-]
-
-headers = [
-    "RUN",
-    "BITS",
-    "MINRAM",
-    "MINREG",
-    "IMPORT"
-]
-
-cmplx_subs = {
-    "SRS": [],
-    "BSS": [],
-    "MOD": [],
-    "CAL": ["special"],
-    "PSH": ["special"],
-    "POP": ["special"],
-    "MLT": [
-        instruction("", "PSH", ["<B>"]),
-        instruction("", "IMM", ["<A>", "0"]),
-        instruction("", "BNZ", ["+3"]),
-        instruction("", "ADD", ["<A>", "<A>", "<C>"]),
-        instruction("", "DEC", ["<B>", "<B>"]),
-        instruction("", "JMP", ["-3"]),
-        instruction("", "POP", ["<B>"]),
-    ],
-    "DIV": [
-        instruction("", "PSH", ["<B>"]),
-        instruction("", "IMM", ["<A>", "0"]),
-        instruction("", "SUB", ["<B>", "<B>", "<C>"]),
-        instruction("", "BRC", ["+3"]),
-        instruction("", "INC", ["<A>", "<A>"]),
-        instruction("", "JMP", ["-3"]),
-        instruction("", "POP", ["<B>"]),
-    ],
-    "BRL": [
-        instruction("", "SUB", ["$0", "<B>", "<C>"]),
-        instruction("", "BNC", ["<A>"]),
-    ],
-    "BRG": [
-        instruction("", "SUB", ["$0", "<C>", "<B>"]),
-        instruction("", "BNC", ["<A>"]),
-    ],
-    "BRE": [
-        instruction("", "CMP", ["<B>", "<C>"]),
-        instruction("", "BRZ", ["<A>"]),
-    ],
-    "BNE": [
-        instruction("", "CMP", ["<B>", "<C>"]),
-        instruction("", "BNZ", ["<A>"]),
-    ],
-    "BSR": [
-        instruction("", "PSH", ["<C>"]),
-        instruction("", "MOV", ["<A>", "<B>"]),
-        instruction("", "RSH", ["<A>", "<A>"]),
-        instruction("", "DEC", ["<C>", "<C>"]),
-        instruction("", "BNZ", ["-2"]),
-        instruction("", "POP", ["<C>"]),
-    ],
-    "BSR": [
-        instruction("", "PSH", ["<C>"]),
-        instruction("", "MOV", ["<A>", "<B>"]),
-        instruction("", "RSH", ["<A>", "<A>"]),
-        instruction("", "DEC", ["<C>", "<C>"]),
-        instruction("", "BNZ", ["-2"]),
-        instruction("", "POP", ["<C>"]),
-    ],
-    "CMP": [
-      instruction("", "SUB", ["$0", "<A>", "<B>"])
-    ],
-    "ADC": [
-        instruction("", "BNC", ["+3"]),
-        instruction("", "ADD", ["<A>", "<B>", "<C>"]),
-        instruction("", "JMP", ["+3"]),
-        instruction("", "ADD", ["<A>", "<B>", "<C>"]),
-        instruction("", "INC", ["<A>", "<A>"]),
-    ],
-    "SBB": [
-        instruction("", "BNC", ["+3"]),
-        instruction("", "SUB", ["<A>", "<B>", "<C>"]),
-        instruction("", "JMP", ["+3"]),
-        instruction("", "SUB", ["<A>", "<B>", "<C>"]),
-        instruction("", "DEC", ["<A>", "<A>"]),
-    ],
-    "SETE": [
-      instruction("", "CMP", ["<B>", "<C>"]),
-      instruction("", "BNZ", ["+2"]),
-      instruction("", "IMM", ["<A>", "1"]),
-    ],
-    "SETNE": [
-      instruction("", "CMP", ["<B>", "<C>"]),
-      instruction("", "BRZ", ["+2"]),
-      instruction("", "IMM", ["<A>", "1"]),
-    ],
-    "SETG": [
-      instruction("", "CMP", ["<B>", "<C>"]),
-      instruction("", "BRC", ["+2"]),
-      instruction("", "IMM", ["<A>", "1"]),
-    ],
-    "SETL": [
-      instruction("", "CMP", ["<B>", "<C>"]),
-      instruction("", "BNC", ["+2"]),
-      instruction("", "IMM", ["<A>", "1"]),
-    ],
-    "SETGE": [
-      instruction("", "CMP", ["<B>", "<C>"]),
-      instruction("", "BRC", ["+2"]),
-      instruction("", "IMM", ["<A>", "1"]),
-    ],
-    "SETLE": [
-      instruction("", "CMP", ["<C>", "<B>"]),
-      instruction("", "BRC", ["+2"]),
-      instruction("", "IMM", ["<A>", "1"]),
-    ],
-    "BOD": [
-      instruction("", "PSH", ["<B>"]),
-      instruction("", "AND", ["<B>", "<B>", "1"]),
-      instruction("", "BRZ", ["+3"]),
-      instruction("", "POP", ["<B>"]),
-      instruction("", "JMP", ["<A>"]),
-      instruction("", "POP", ["<B>"]),
-    ],
-    "BEV": [
-      instruction("", "PSH", ["<B>"]),
-      instruction("", "AND", ["<B>", "<B>", "1"]),
-      instruction("", "BNZ", ["+3"]),
-      instruction("", "POP", ["<B>"]),
-      instruction("", "JMP", ["<A>"]),
-      instruction("", "POP", ["<B>"]),
-    ],
-    "BLE": [
-      instruction("", "CMP", ["<C>","<B>"]),
-      instruction("", "BNC", ["<A>"])
-    ],
-    "BGE": [
-      instruction("", "CMP", ["<B>","<C>"]),
-      instruction("", "BRC", ["<A>"])
-    ],
-    "BZR": [
-      instruction("", "ADD", ["<B>", "<B>", "$0"]),
-      instruction("", "BRZ", ["<A>"])
-    ],
-    "NEG": [
-      instruction("", "SUB", ["<A>", "$0", "<B>"])
-    ]
-}
+def initialiseGlobals():
+    global labelCount
+    labelCount = 0
+    global regUsage
+    regUsage = []
+    global ramUsage
+    ramUsage = []
+    global maxRes
+    maxRes = 0
+    global SPreg
+    SPreg = 0
+    global fixSP
+    fixSP = True
+    global spisreg
+    spisreg = True
+    global usestacknotreg
+    usestacknotreg = False
+    global temp
+    temp = 0
+    global MINRAM
+    MINRAM = 0
+    global MINREG
+    MINREG = 0
+    global BITS
+    BITS = ("", 0)
+    global RUNRAM
+    RUNRAM = False
+    global IMPORTS
+    IMPORTS = []
+    global IMPORTED
+    IMPORTED = []
+    return
 
 def importProgram(name):
     try:
@@ -275,6 +48,12 @@ def importProgram(name):
         )
 
 def removeComments(program):
+    # Removes all comments from the code
+    # Changes all registers denoted with R to $
+    # Changes all memory addresses denoted with M to #
+    # Removes any illegal characters
+    # Strips any pragmas, as such, @ is an illegal character
+    # Removes any empty lines
     for y in range(len(program)):
         line = program[y].rstrip("\n").split("//")[0].split(";")[0].strip().split(" ")
         if program[y].startswith("@"):
@@ -285,20 +64,13 @@ def removeComments(program):
                 line[x] = "$" + line[x][1:]
             if len(line[x]) >= 2 and line[x][0] == "M" and line[x][1].isnumeric():
                 line[x] = "#" + line[x][1:]
-            line[x] = "".join(
-                list(
-                    filter(
-                        lambda a: (
-                            a in " _.-+=*<()>$#&" or a.isnumeric() or a.isalpha()
-                        ),
-                        line[x],
-                    )
-                )
-            )
+            line[x] = "".join(list(filter(lambda a: (a in " _.-+=*<()>$#&%" or a.isnumeric() or a.isalpha()),line[x],)))
         program[y] = " ".join(line)
     return list(filter(None, program))
 
 def convertToInstructions(program):
+    # Converts all lines of code to instruction objects
+    # Removes any empty lines
     global RUNRAM
     global operands
     global labelCount
@@ -317,13 +89,11 @@ def convertToInstructions(program):
             code.append(instruction(label, opcode, operandList))
             label = ""
         else:
-            end(
-                f"Unknown instruction '{line[0]}'",
-                "- try checking:\n1. Is the file written in the lastest version of URCL?\n2. If so, has anyone raised this missing feature on the URCL discord yet? (https://discord.gg/jWRr2vx)",
-            )
+            end(f"Unknown instruction '{line[0]}'","- try checking:\n1. Is the file written in the lastest version of URCL?\n2. If so, has anyone raised this missing feature on the URCL discord yet? (https://discord.gg/jWRr2vx)",)
     return list(filter(None, code))
 
 def fixLabels(program):
+    # Converts all relative addresses to absolute addresses with labels
     global JMPnching_ops
     global labelCount
     try:
@@ -345,12 +115,12 @@ def fixLabels(program):
                         program[x].operandList[0] = program[x + int(address)].label
         return program
     except Exception as ex:
-        end(
-            ex,
-            "- try checking:\n1. Is there a bug in the URCL program, such as JMPnching past the end?\n2. If not, this may be an error with URCL.py, if you are sure it is, then please report it on the URCL discord. (https://discord.gg/jWRr2vx)",
-        )
+        end(ex,"- try checking:\n1. Is there a bug in the URCL program, such as JMPnching past the end?\n2. If not, this may be an error with URCL.py, if you are sure it is, then please report it on the URCL discord. (https://discord.gg/jWRr2vx)",)
 
 def replaceComplex(program):
+    # Replaces any unsupported complex instructions with core translations
+    # Links up CAL and RET, handling function calls and inserting necessary instructions
+    # PSH, POP, and CAL are all handled in a special way
     global labelCount
     global temp
     for x in range(len(program)):
@@ -430,6 +200,30 @@ def replaceComplex(program):
                     ]
                 program = program[:x] + insert + program[x+1:]
                 return False, program
+            elif opcode == "MLT":
+                insert = [
+                    instruction("", "PSH", ["<B>"]),
+                    instruction("", "IMM", ["<A>", "0"]),
+                    instruction(f".label__{labelCount+1}__", "IMM", [f"${temp+2}", f".label__{labelCount}__"]),
+                    instruction("", "BZR", [f"${temp+2}", "<B>"]),
+                    instruction("", "ADD", ["<A>", "<A>", "<C>"]),
+                    instruction("", "DEC", ["<B>", "<B>"]),
+                    instruction("", "IMM", [f"${temp+2}", f".label__{labelCount+1}__"]),
+                    instruction("", "JMP", [f"${temp+2}"]),
+                    instruction(f".label__{labelCount}__", "POP", ["<B>"])
+                ]
+                if operandList[0] == operandList[1]:
+                    insert[-1].operandList[0] = "$0"
+                coreTranslation = insert
+                for i, instr in enumerate(coreTranslation):
+                    if i == 0:
+                        coreTranslation[0].label = label
+                    for y in range(len(coreTranslation[i].operandList)):
+                        for z in range(0, 26):
+                            if f"<{chr(z+65)}>" in coreTranslation[i].operandList[y]:
+                                coreTranslation[i].operandList[y] = operandList[z]
+                program = program[:x] + coreTranslation + program[x + 1 :]
+                return False, program
             else:
                 coreTranslation = copy.deepcopy(cmplx_subs[opcode])
                 for i, instr in enumerate(coreTranslation):
@@ -444,6 +238,10 @@ def replaceComplex(program):
     return True, program
 
 def optimise(program):
+    # Performs basic optimisations and code tweaks:
+    # - MOV A, A gets deleted
+    # - IMM reg, reg becomes MOV
+    # - RET becomes JMP
     done = False
     while not done:
         done = True
@@ -462,11 +260,6 @@ def optimise(program):
             if line.opcode == "RET" and line.operandList != []:
                 program[x].opcode = "JMP"
     return program
-
-def countPatternLength(segments):
-    segments = " ".join(segments)
-    segments = "".join(list(filter(lambda a: a not in " _", segments)))
-    return len(segments)
 
 def fixImmediates(program):
     global JMPnching_ops
@@ -507,7 +300,8 @@ def fixImmediates(program):
                                 continue
                             for w in range(1, len(part)):
                                 segments[z] += part[w]
-                                if countPatternLength(segments) == bits:
+                                segmentString = "".join(segments)
+                                if segmentString.count("0") + segmentString.count("1") == bits:
                                     done = True
                                     break
                     segments = " ".join(segments)
@@ -523,22 +317,23 @@ def convertToISA(program):
         ISAsnippet = ISA.Instruction_table[line.opcode][1:].copy()
         for x in range(len(line.operandList)):
             if line.operandList[x][0] == ".":
-                line.operandList[x] = "#__" + line.operandList[x]
+                line.operandList[x] = "#__" + line.operandList[x] + "__"
         for x in range(len(ISAsnippet)):
             for z in range(0, 26):
                 if f"<{chr(z+65)}>" in ISAsnippet[x]:
                     ISAsnippet[x] = ISAsnippet[x].replace(f"<{chr(z+65)}>", line.operandList[z])
         if line.label != "":
-            ISAsnippet[0] = ISAsnippet[0] + f" %__{line.label}"
+            ISAsnippet[0] = ISAsnippet[0] + f" %__{line.label}__"
         ISAprogram += ISAsnippet
     return ISAprogram
 
 def removeISALabels(program):
     for x in range(len(program)):
         if "%__." in program[x]:
-            label, program[x] = program[x].split("%__")[1], program[x].split("%__")[0]
+            program[x], label = program[x].split("%__")
             for y in range(len(program)):
-                program[y] = program[y].replace(f"#__{label}", f"{x}")
+                if f"#__{label}" in program[y]:
+                    program[y] = program[y].replace(f"#__{label}", f"{x}")
     return program
 
 def readHeaders(program):
@@ -561,8 +356,8 @@ def readHeaders(program):
     while not done:
         for x, line in enumerate(program):
             if line.opcode == "BITS":
-                if not eval(f"{ISA.CPU_stats['DATABUS_WIDTH']} {BITS[0]} {BITS[1]}"):
-                    print(f"WARNING: this program is designed for a CPU with a databus width {BITS[0]} {BITS[1]}. (Target ISA is {ISA.CPU_stats['DATABUS_WIDTH']})")
+                if not eval(f"{ISA.CPU_stats['DATABUS_WIDTH']} {line.operandList[0]} {line.operandList[1]}"):
+                    print(f"WARNING: this program is designed for a CPU with a databus width {line.operandList[0]} {line.operandList[1]}. (Target ISA is {ISA.CPU_stats['DATABUS_WIDTH']})")
                 program.pop(x)
             elif line.opcode == "RUN":
                 if not (RUNRAM == ISA.CPU_stats["RUN_RAM"]):
@@ -741,11 +536,9 @@ def regSubstitution(program):
         offenders = []
         for y, operand in enumerate(line.operandList):
           if operand[0] != "$" and operand != "SP" and operand not in offenders:
-            if line.opcode == "LOD" and y == 1:
-              ex = True
+            if line.opcode == "IN" and y == 1:
               continue
-            elif line.opcode == "STR" and y == 0:
-              ex = True
+            elif line.opcode == "OUT" and y == 0:
               continue
             else:
               offenders.append(operand)
@@ -798,10 +591,18 @@ def regSubstitution(program):
         label = line.label
         used = 1
         offenders = {}
+        skip = 9999
         for y, operand in enumerate(line.operandList):
           if operand[0] != "$" and operand != "SP" and offenders.get(operand, None) == None:
-            offenders[operand] = maxReg + used
-            used += 1
+            if line.opcode == "IN" and y == 1:
+                skip = 1
+                continue
+            elif line.opcode == "OUT" and y == 0:
+                skip = 0
+                continue
+            else:
+              offenders[operand] = maxReg + used
+              used += 1
         if len(offenders) == 0:
           continue
         line.label = ""
@@ -810,6 +611,8 @@ def regSubstitution(program):
           insert.append(instruction(label, "IMM", [f"${offenders[key]}", f"{key}"]))
           label = ""
         for y, operand in enumerate(line.operandList):
+          if y == skip:
+            continue
           if operand[0] != "$" and operand != "SP":
             line.operandList[y] = f"${offenders[line.operandList[y]]}"
         insert.append(line)
@@ -931,11 +734,6 @@ def main():
     program = fixImmediates(program)
     program = fixLabels(program)
     program = readHeaders(program)
-    if not spisreg: program = fixStackPointer(program)
-    for ins in program:
-      if ins.opcode in ["PSH","POP","CAL"] or "SP" in ins.operandList:
-          program = setupStack(program)
-          break
     program = importLibs(program)
     program = reduceLibs(program)
     program = fixLabels(program)
@@ -952,6 +750,11 @@ def main():
         program = allocateReservedRAM(program)
         program = regSubstitution(program)
         done, program = replaceComplex(program)
+    if not spisreg: program = fixStackPointer(program)
+    for ins in program:
+        if ins.opcode in ["PSH","POP","CAL"] or "SP" in ins.operandList:
+            program = setupStack(program)
+            break
     program = fixStackPointer(program)
     program = flipStack(program)
     try: program, operands = ISA.CleanURCL(program, operands)
@@ -1003,7 +806,9 @@ def main():
     outfile.close()
     print(f"{ISA.__name__} code dumped in: {filename}")
     return
+
 if __name__ == "__main__":
+    initialiseGlobals()
     if len(s.argv) > 1:
         exec(f"import ISA_configs.{s.argv[1]} as ISA")
     else:
