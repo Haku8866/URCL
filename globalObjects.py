@@ -113,6 +113,7 @@ cmplx_subs = {
         instruction("", "POP", ["<B>"]),
     ],
     "CAL": ["special"],
+    "RET": ["special"],
     "PSH": ["special"],
     "POP": ["special"],
     "MLT": ["special"],
@@ -222,7 +223,7 @@ cmplx_subs = {
     ],
     "BLE": [
       instruction("", "CMP", ["<C>","<B>"]),
-      instruction("", "BNC", ["<A>"])
+      instruction("", "BRC", ["<A>"])
     ],
     "BGE": [
       instruction("", "CMP", ["<B>","<C>"]),
