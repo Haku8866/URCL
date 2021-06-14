@@ -52,19 +52,20 @@ def removeComments(program):
     # Changes all registers denoted with R to $
     # Changes all memory addresses denoted with M to #
     # Removes any illegal characters
-    # Strips any pragmas, as such, @ is an illegal character
+    # Strips any unrecognised pragmas
     # Removes any empty lines
     for y in range(len(program)):
         line = program[y].rstrip("\n").split("//")[0].split(";")[0].strip().split(" ")
         if program[y].startswith("@"):
-            line = [""]
+            if program[y].split()[0] not in ["@CALL", "@DEFINE", "@USE"]:
+                line = [""]
         for x in range(len(line)):
             line[x] = line[x].strip()
             if len(line[x]) >= 2 and line[x][0] == "R" and line[x][1].isnumeric():
                 line[x] = "$" + line[x][1:]
             if len(line[x]) >= 2 and line[x][0] == "M" and line[x][1].isnumeric():
                 line[x] = "#" + line[x][1:]
-            line[x] = "".join(list(filter(lambda a: (a in " _.-+=*<()>$#&%" or a.isnumeric() or a.isalpha()),line[x],)))
+            line[x] = "".join(list(filter(lambda a: (a in " _.-+=*<()>$#&%@" or a.isnumeric() or a.isalpha()),line[x],)))
         program[y] = " ".join(line)
     return list(filter(None, program))
 
@@ -84,7 +85,7 @@ def convertToInstructions(program):
         )
         if line[0][0] == ".":
             label = " ".join(line)
-        elif operandCount != None:
+        elif operandCount != None or line[0][0] == "@":
             operandList = line[1:]
             code.append(instruction(label, opcode, operandList))
             label = ""
@@ -130,62 +131,75 @@ def replaceComplex(program):
             program[x].label,
             program[x].operandList,
         )
-        if ISA.Instruction_table.get(opcode) == None and cmplx_subs.get(opcode) != None:
+        if ISA.Instruction_table.get(opcode) == None and cmplx_subs.get(opcode) != None or opcode[0] == "@":
             if opcode == "CAL":
-                operandList = " ".join(operandList)
-                if "$" in operandList:
-                    labelName = operandList.split("(")[0] + str(len(operandList.split()))
-                else:
-                    labelName = operandList.split("(")[0]
-                operands = operandList.split("(")[1][:-1]
-                operands = operands.split()
-                operands = [o.strip() for o in operands]
-                for y in range(len(program)):
-                    if f"{labelName}" in program[y].label:
-                        funcLabelName = program[y].label
-                        form = program[y].label.split("(")[1].split("#")[0]
-                        regs = int(program[y].label.split("#")[1][:-1])
-                ret_addr = f".label__{labelCount}__"
+                program[x+1].label = f".label__{labelCount}__"
+                insert = [
+                    instruction(label, "PSH", [f".label__{labelCount}__"]),
+                    instruction("", "JMP", [operandList[0]]),
+                ]
                 labelCount += 1
-                insert = [instruction(program[x].label, "PSH", [ret_addr])]
-                for y,operand in enumerate(operands):
-                    if form[y] == "i":
-                        insert.append(instruction("", "PSH", [operand]))
-                insert.append(instruction("", "JMP", [funcLabelName]))
-                index = len(insert)
-                for y in range(form.count("o")):
-                    insert.append(instruction("", "POP", [f"${form.count('o')-y}"]))
-                insert.append(instruction("", "ADD", ["SP", "SP", f"{regs + form.count('i') + 1}"]))
-                insert[index].label = ret_addr
-                marker = 0
-                for y in range(len(program)):
-                    if funcLabelName == program[y].label:
-                        insert2 = []
-                        for z in range(regs):
-                            insert2.append(instruction(program[y].label, "PSH", [f"${z+1}"]))
-                            program[y].label = ""
-                        insert2.append(instruction("", "ADD", ["SP", "SP", str(regs)]))
-                        for z in range(form.count("i")):
-                            insert2.append(instruction("", "POP", [f"${len(form)-z}"]))
-                        insert2.append(instruction("", "SUB", ["SP", "SP", str(regs+form.count("i"))]))
-                        program = program[:y] + insert2 + program[y:]
-                        marker = y
-                        break
-                for y in range(marker, len(program)):
-                    if program[y].opcode == "RET":
-                        insert2 = []
-                        for z in range(form.count("o")):
-                            insert2.append(instruction(program[y].label, "PSH", [f"${z+1}"]))
-                            program[y].label = ""
-                        insert2.append(instruction("", "ADD", ["SP", "SP", str(form.count("o"))]))
-                        for z in range(regs):
-                            insert2.append(instruction("", "POP", [f"${regs-z}"]))
-                        insert2.append(instruction("", "ADD", ["SP", "SP", str(form.count("i"))]))
-                        insert2.append(instruction("", "POP", [f"${temp+2}"]))
-                        insert2.append(instruction("", "SUB", ["SP", "SP", str(len(form) + regs + 1)]))
-                        insert2.append(instruction("", "JMP", [f"${temp+2}"]))
-                        program = program[:y] + insert2 + program[y+1:]
                 program = program[:x] + insert + program[x+1:]
+                return False, program
+            elif opcode == "RET":
+                insert = [
+                    instruction(label, "POP", [f"${temp+1}"]),
+                    instruction("", "JMP", [f"${temp+1}"])
+                ]
+                program = program[:x] + insert + program[x+1:]
+                return False, program
+            elif opcode == "@CALL":
+                insert = []
+                target = operandList[0].split("(")[0]
+                regs_used = 0
+                inputs = 0
+                outputs = 0
+                hit = False
+                for y, line in enumerate(program):
+                    if line.opcode == "@DEFINE":
+                        if line.operandList[0].split("(")[0] == target:
+                            hit = True
+                            outputs = len(" ".join(line.operandList).split("=")[0].split())
+                            inputs = len(" ".join(line.operandList).split("=")[1].split())
+                            regs_used = inputs + outputs
+                    if line.opcode == "@USE" and hit:
+                        regs_used += len(line.operandList)
+                    if line.opcode == "RET" and hit:
+                        break
+                inlist = []
+                outlist = []
+                if len(operandList) > 1:
+                    inlist = " ".join(operandList).split("=")[1][:-1].split()
+                    outlist = " ".join(operandList).split("=")[0].split("(")[1].split()
+                for y in range(outputs+1, regs_used+1):
+                    insert.append(instruction("", "PSH", [f"${y}"]))
+                for y, inreg in enumerate(inlist):
+                    insert.append(instruction("", "MOV", [f"${y+outputs+1}", inreg]))
+                insert.append(instruction("", "CAL", [target + f"({outputs}/{inputs}/{regs_used})"]))
+                for y, outreg in enumerate(outlist):
+                    insert.append(instruction("", "MOV", [outreg, f"${y+1}"]))
+                for y in range(regs_used, outputs, -1):
+                    insert.append(instruction("", "POP", [f"${y}"]))
+                program = program[:x] + insert + program[x+1:]
+                program[x].label = label
+                return False, program
+            elif opcode in ["@DEFINE"]:
+                target = operandList[0].split("(")[0]
+                inputs = len(" ".join(operandList).split("=")[1].split())
+                outputs = len(" ".join(operandList).split("=")[0].split())
+                regs_used = inputs + outputs
+                for y in range(x, len(program)):
+                    if program[y].opcode == "RET":
+                        break
+                    elif program[y].opcode == "@USE":
+                        regs_used += len(program[y].operandList)
+                        break
+                program = program[:x] + program[x+1:]
+                program[x].label = target + f"({outputs}/{inputs}/{regs_used})"
+                return False, program
+            elif opcode in ["@USE","@BITS","@RUN","@MINSTACK","@MINRAM"]:
+                program = program[:x] + program[x+1:]
+                program[x].label = label
                 return False, program
             elif opcode in ["POP", "PSH"]:
                 if opcode == "PSH":
@@ -212,6 +226,7 @@ def replaceComplex(program):
                     instruction("", "JMP", [f"${temp+2}"]),
                     instruction(f".label__{labelCount}__", "POP", ["<B>"])
                 ]
+                labelCount += 2
                 if operandList[0] == operandList[1]:
                     insert[-1].operandList[0] = "$0"
                 coreTranslation = insert
@@ -388,28 +403,33 @@ def importLibs(program):
     while not done:
         done = True
         for x, line in enumerate(program):
-            if line.opcode == "CAL" and line.operandList[0][1:].split("_")[0] in IMPORTS:
+            if line.opcode == "@CALL" and line.operandList[0][1:].split('_')[0] in IMPORTS:
+                outputs = len(" ".join(line.operandList).split("=")[0].split())
+                inputs = len(" ".join(line.operandList).split("=")[1].split())
                 done = False
                 libfile = open(f"lib_{line.operandList[0][1:].split('_')[0]}.urcl", "r")
                 function = []
                 copy = False
                 for y, subline in enumerate(libfile):
-                    if subline.split("//")[0].strip() == "":
+                    subline = subline.split("//")[0].strip()
+                    if subline == "":
                         continue
-                    if subline.split()[0] == "NAME" and subline.split()[1] == line.operandList[0].split("_")[1].split("(")[0]:
-                        copy = True
-                        function.append(f"NAME {line.operandList[0][1:].split('(')[0]}")
-                        continue
+                    if subline.split()[0] == "@DEFINE" and subline.split()[1].split("(")[0][1:] == line.operandList[0].split("_")[1].split("(")[0]:
+                        operandList = subline.split()[1:]
+                        if inputs == len(" ".join(operandList).split("=")[1].split()) and outputs == len(" ".join(line.operandList).split("=")[0].split()):
+                            copy = True
+                            function.append(f"@DEFINE .{line.operandList[0][1:].split('_')[0]}_" + " ".join(subline.split()[1:])[1:])
+                            continue
                     if copy:
-                        if subline.split()[0] == "BITS" and not eval(f"{ISA.CPU_stats['DATABUS_WIDTH']} {subline.split()[1]} {subline.split()[2]}"):
+                        if subline.split()[0] == "@BITS" and not eval(f"{ISA.CPU_stats['DATABUS_WIDTH']} {subline.split()[1]} {subline.split()[2]}"):
                             copy = False
                             function = []
                             continue
-                        elif subline.split()[0] == "RUN" and not (("RAM" == subline.split()[1]) == ISA.CPU_stats["RUN_RAM"]):
+                        elif subline.split()[0] == "@RUN" and not (("RAM" == subline.split()[1]) == ISA.CPU_stats["RUN_RAM"]):
                             copy = False
                             function = []
                             continue
-                        elif subline.split()[0] == "OPS" and not (len(line.operandList) == int(subline.split()[1])):
+                        elif subline.split()[0] == "@USE" and not (len(line.operandList) == len(subline.operandList)):
                             copy = False
                             function = []
                             continue
@@ -520,7 +540,7 @@ def regSubstitution(program):
   global maxRes
   global usestacknotreg
   global temp
-  blocked = ["IMM", "CAL", "DW"]
+  blocked = ["IMM", "DW", "CAL"]
   for opcode in ISA.Instruction_table:
       if not ISA.Instruction_table.get(opcode, [True])[0]:
           blocked.append(opcode)
@@ -530,7 +550,7 @@ def regSubstitution(program):
     while not done:
       done = True
       for x, line in enumerate(program):
-        if line.opcode in blocked:
+        if line.opcode in blocked or line.opcode[0] == "@":
           continue
         label = line.label
         offenders = []
@@ -575,7 +595,7 @@ def regSubstitution(program):
     if temp == 0:
         maxReg = 0
         for line in program:
-            if line.opcode == "CAL":
+            if line.opcode[0] == "@":
                 continue
             for operand in line.operandList:
                 if operand[0] == "$":
@@ -586,7 +606,7 @@ def regSubstitution(program):
     while not done:
       done = True
       for x, line in enumerate(program):
-        if line.opcode in blocked:
+        if line.opcode in blocked or line.opcode[0] == "@":
           continue
         label = line.label
         used = 1
@@ -632,7 +652,7 @@ def fixStackPointer(program):
         if SPreg == 0:
             maxReg = 0
             for line in program:
-                if line.opcode == "CAL":
+                if line.opcode[0] == "@":
                     continue
                 for operand in line.operandList:
                     if operand[0] == "$":
@@ -735,7 +755,7 @@ def main():
     program = fixLabels(program)
     program = readHeaders(program)
     program = importLibs(program)
-    program = reduceLibs(program)
+    #program = reduceLibs(program)
     program = fixLabels(program)
     program = fixImmediates(program)
     program = optimise(program)
