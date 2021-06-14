@@ -2,10 +2,12 @@ import sys as s
 import os
 import colorama
 import time
+import traceback
 
 operands = {"NEG": 2,"DW": 1,"DD": 1,"DQ": 1,"ADD": 3,"SUB": 3,"BSR": 3,"BSL": 3,"ADC": 3,"SBB": 3,"INC": 2,"DEC": 2,"MOV": 2,"IMM": 2,"XOR": 3,"AND": 3,"OR": 3,"NOR": 3,"NAND": 3,"XNOR": 3,"NOT": 2,"LOD": 2,"STR": 2,"JMP": 1,"BRC": 1,"BNC": 1,"BRZ": 1,"BNZ": 1,"BRN": 1,"BRP": 1,"BZR": 2,"BZN": 2,"NOP": 0,"HLT": 0,"MLT": 3,"DIV": 3,"MOD": 3,"SQRT": 2,"CAL": 1,"RET": 0,"PSH": 1,"POP": 1,"BRL": 3,"BRG": 3,"BRE": 3,"BNE": 3,"IN": 2,"OUT": 2,"BOD": 2,"BEV": 2,"RSH": 2,"LSH": 2,"CMP": 2,"SRS": 3,"BSS": 3,"BLE": 3,"BGE": 3,"BITS": 2,"MINREG": 1,"RUN": 1,"MINRAM": 1,"IMPORT": 0,"NAME": 1,"OPS": 1,"REG": 1,"IN": 1,"SETE": 3,"SETNE": 3,"SETG": 3,"SETL": 3,"SETGE": 3,"SETLE": 3,}
 RUNRAM = True
 databuswidth = 8
+PC = 0
 
 class instruction:
   def __init__(self, label, opcode, operandList):
@@ -88,10 +90,11 @@ def getState(program_input, databuswidth):
   global FLAG
   global REG
   global BITS
+  global PC
+  PC = 0
   cycles = 0
   BITS = databuswidth
   RAM = []
-  PC = 0
   STACK = ["-" for x in range(10)]
   REG = ["-" for x in range(BITS)]
   LABEL = {}
@@ -387,6 +390,7 @@ def main():
     elif ex.__class__ is IndexError:
       print(f"Index out of bounds error! You're either:\n - 1) Using too many registers (this CPU only has {databuswidth}), try using some memory instead.\n - 2) Using too much memory (this CPU only has {2**BITS} words), try making your program more efficient, or target {databuswidth*2} bit CPUs instead.")
     else:
-      print(ex)
+      print(f"URCL code line: {PC}")
+      print(traceback.format_exc())
 if __name__ == "__main__":
   main()
