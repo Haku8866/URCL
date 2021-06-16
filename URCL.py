@@ -65,7 +65,7 @@ def removeComments(program):
                 line[x] = "$" + line[x][1:]
             if len(line[x]) >= 2 and line[x][0] == "M" and line[x][1].isnumeric():
                 line[x] = "#" + line[x][1:]
-            line[x] = "".join(list(filter(lambda a: (a in " _.-+=*<()>$#&%@" or a.isnumeric() or a.isalpha()),line[x],)))
+            line[x] = "".join(list(filter(lambda a: (a in " _.-+=*<()>$#&/%@" or a.isnumeric() or a.isalpha()),line[x],)))
         program[y] = " ".join(line)
     return list(filter(None, program))
 
@@ -84,7 +84,10 @@ def convertToInstructions(program):
             program[x].split()[0],
         )
         if line[0][0] == ".":
-            label = " ".join(line)
+            if label != "":
+                label += " ".join(line)
+            else:
+                label = " ".join(line)
         elif operandCount != None or line[0][0] == "@":
             operandList = line[1:]
             code.append(instruction(label, opcode, operandList))
@@ -121,7 +124,7 @@ def fixLabels(program):
 def replaceComplex(program):
     # Replaces any unsupported complex instructions with core translations
     # Links up CAL and RET, handling function calls and inserting necessary instructions
-    # PSH, POP, and CAL are all handled in a special way
+    # PSH, POP, MLT, @CALL, and CAL are all handled in a special way
     global labelCount
     global temp
     for x in range(len(program)):
@@ -159,7 +162,7 @@ def replaceComplex(program):
                     if line.opcode == "@DEFINE":
                         if line.operandList[0].split("(")[0] == target:
                             hit = True
-                            outputs = len(" ".join(line.operandList).split("=")[0].split())
+                            outputs = len(" ".join(line.operandList).split("=")[0].split("(")[1])
                             inputs = len(" ".join(line.operandList).split("=")[1].split())
                             regs_used = inputs + outputs
                     if line.opcode == "@USE" and hit:
@@ -186,7 +189,7 @@ def replaceComplex(program):
             elif opcode in ["@DEFINE"]:
                 target = operandList[0].split("(")[0]
                 inputs = len(" ".join(operandList).split("=")[1].split())
-                outputs = len(" ".join(operandList).split("=")[0].split())
+                outputs = len(" ".join(operandList).split("=")[0].split("(")[1])
                 regs_used = inputs + outputs
                 for y in range(x, len(program)):
                     if program[y].opcode == "RET":
@@ -279,7 +282,7 @@ def optimise(program):
 def fixImmediates(program):
     global JMPnching_ops
     for x, line in enumerate(program):
-        if line.opcode not in JMPnching_ops and line.opcode != "CAL":
+        if line.opcode not in JMPnching_ops:
             for y, operand in enumerate(line.operandList):
                 if len(operand) > 2:
                     if operand[0] == "0" and operand[1].isalpha():
@@ -406,31 +409,26 @@ def importLibs(program):
             if line.opcode == "@CALL" and line.operandList[0][1:].split('_')[0] in IMPORTS:
                 outputs = len(" ".join(line.operandList).split("=")[0].split())
                 inputs = len(" ".join(line.operandList).split("=")[1].split())
-                done = False
                 libfile = open(f"lib_{line.operandList[0][1:].split('_')[0]}.urcl", "r")
                 function = []
-                copy = False
+                copyCode = False
                 for y, subline in enumerate(libfile):
                     subline = subline.split("//")[0].strip()
                     if subline == "":
                         continue
                     if subline.split()[0] == "@DEFINE" and subline.split()[1].split("(")[0][1:] == line.operandList[0].split("_")[1].split("(")[0]:
                         operandList = subline.split()[1:]
-                        if inputs == len(" ".join(operandList).split("=")[1].split()) and outputs == len(" ".join(line.operandList).split("=")[0].split()):
-                            copy = True
+                        if inputs == len(" ".join(operandList).split("=")[1].split()) and outputs == len(" ".join(operandList).split("=")[0].split()):
+                            copyCode = True
                             function.append(f"@DEFINE .{line.operandList[0][1:].split('_')[0]}_" + " ".join(subline.split()[1:])[1:])
                             continue
-                    if copy:
+                    if copyCode:
                         if subline.split()[0] == "@BITS" and not eval(f"{ISA.CPU_stats['DATABUS_WIDTH']} {subline.split()[1]} {subline.split()[2]}"):
-                            copy = False
+                            copyCode = False
                             function = []
                             continue
                         elif subline.split()[0] == "@RUN" and not (("RAM" == subline.split()[1]) == ISA.CPU_stats["RUN_RAM"]):
-                            copy = False
-                            function = []
-                            continue
-                        elif subline.split()[0] == "@USE" and not (len(line.operandList) == len(subline.operandList)):
-                            copy = False
+                            copyCode = False
                             function = []
                             continue
                         function.append(subline.strip())
@@ -439,8 +437,6 @@ def importLibs(program):
                 libfile.close()
                 function = removeComments(function)
                 function = convertToInstructions(function)
-                function = fixImmediates(function)
-                function = fixLabels(function)
                 match = False
                 for x,item in enumerate(IMPORTED):
                     match = True
@@ -455,11 +451,12 @@ def importLibs(program):
                     if match:
                         break
                 if not match:
+                    IMPORTED.append(copy.deepcopy(function))
+                    function = fixImmediates(function)
+                    function = fixLabels(function)
                     program += function
-                    IMPORTED.append(function)
+                    done = False
                     break
-                else:
-                    done = True
     return program
 
 def reduceLibs(program):
@@ -732,7 +729,7 @@ def shiftFunctionRAM(program):
     global MINRAM
     shift = False
     for x, ins in enumerate(program):
-        if "#" in ins.label and ")" in ins.label:
+        if "(" in ins.label and ")" in ins.label:
             shift = True
         if ins.opcode == "RET":
             shift = False
@@ -760,7 +757,6 @@ def main():
     program = fixImmediates(program)
     program = optimise(program)
     program = regSubstitution(program)
-    program = shiftFunctionRAM(program)
     while not done:
         done, program = replaceComplex(program)
         if not spisreg: program = fixStackPointer(program)
@@ -777,6 +773,7 @@ def main():
             break
     program = fixStackPointer(program)
     program = flipStack(program)
+    program = shiftFunctionRAM(program)
     try: program, operands = ISA.CleanURCL(program, operands)
     except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's clean URCL tweaks. Report this to them if necessary.")
     max_y = os.get_terminal_size().lines
