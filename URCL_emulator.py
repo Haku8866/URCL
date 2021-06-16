@@ -3,6 +3,7 @@ import os
 import colorama
 import time
 import traceback
+from random import randint
 
 operands = {"NEG": 2,"DW": 1,"DD": 1,"DQ": 1,"ADD": 3,"SUB": 3,"BSR": 3,"BSL": 3,"ADC": 3,"SBB": 3,"INC": 2,"DEC": 2,"MOV": 2,"IMM": 2,"XOR": 3,"AND": 3,"OR": 3,"NOR": 3,"NAND": 3,"XNOR": 3,"NOT": 2,"LOD": 2,"STR": 2,"JMP": 1,"BRC": 1,"BNC": 1,"BRZ": 1,"BNZ": 1,"BRN": 1,"BRP": 1,"BZR": 2,"BZN": 2,"NOP": 0,"HLT": 0,"MLT": 3,"DIV": 3,"MOD": 3,"SQRT": 2,"CAL": 1,"RET": 0,"PSH": 1,"POP": 1,"BRL": 3,"BRG": 3,"BRE": 3,"BNE": 3,"IN": 2,"OUT": 2,"BOD": 2,"BEV": 2,"RSH": 2,"LSH": 2,"CMP": 2,"SRS": 3,"BSS": 3,"BLE": 3,"BGE": 3,"BITS": 2,"MINREG": 1,"RUN": 1,"MINRAM": 1,"IMPORT": 0,"NAME": 1,"OPS": 1,"REG": 1,"IN": 1,"SETE": 3,"SETNE": 3,"SETG": 3,"SETL": 3,"SETGE": 3,"SETLE": 3,}
 RUNRAM = True
@@ -17,7 +18,6 @@ end = (lambda ex, tag: input(f"\n--- Something went wrong :( ---\n\n{ex} {tag}\n
 if os.name == 'nt':
     import msvcrt
     import ctypes
-
     class _CursorInfo(ctypes.Structure):
         _fields_ = [("size", ctypes.c_int),
                     ("visible", ctypes.c_byte)]
@@ -228,7 +228,10 @@ def getState(program_input, databuswidth):
       REG[int(operands[0][1:])] = ~REG[int(operands[1][1:])] % 2**(BITS)
     elif opcode == "IN":
       try:
-        REG[int(operands[0][1:])] = int(input(f"IN (num between 0 and {2**BITS-1}): "))
+        if operands[1] == "%RNG":
+          REG[int(operands[0][1:])] = randint(0, (2**BITS)-1)
+        else:
+          REG[int(operands[0][1:])] = int(input(f"IN (num between 0 and {2**BITS-1}): "))
       except:
         REG[int(operands[0][1:])] = 0
     elif opcode == "OUT":
