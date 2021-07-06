@@ -29,9 +29,14 @@ def hide_cursor():
         ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(ci))
         ci.visible = False
         ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
-    elif os.name == 'posix':
-        s.stdout.write("\033[?25l")
-        s.stdout.flush()
+
+def updateFlags(reg):
+  global REG
+  global BITS
+  val = REG[reg]
+  val = (val + 2**BITS) % (2**BITS)
+  REG[reg] = val
+  return
 
 def importProgram(name):
   try: return [line.strip() for line in open(name, "r", encoding="utf8")]
@@ -68,23 +73,6 @@ def convertToInstructions(program):
     else:
       end(f"Unknown instruction '{line[0]}'","- try checking:\n1. Is the file written in the lastest version of URCL?\n2. If so, has anyone raised this missing feature on the URCL discord yet? (https://discord.gg/jWRr2vx)",)
   return list(filter(None, code))
-
-def updateFlags(reg):
-  global FLAG
-  global REG
-  global BITS
-  val = REG[reg]
-  if val >= 2**(BITS): FLAG["CF"] = True
-  else: FLAG["CF"] = False
-  val = (val + 2**BITS) % (2**BITS)
-  if val >= 2**(BITS-1): FLAG["NF"] = True
-  else: FLAG["NF"] = False
-  if val % 2 == 0: FLAG["OF"] = False
-  else: FLAG["OF"] = True
-  if val == 0: FLAG["ZF"] = True
-  else: FLAG["ZF"] = False
-  REG[reg] = val
-  return
 
 def getState(program_input, databuswidth):
   global FLAG
@@ -179,6 +167,15 @@ def getState(program_input, databuswidth):
         while addr >= len(STACK):
           STACK.append("-")
         REG[int(operands[0][1:])] = STACK[addr]
+    elif opcode == "JMP":
+      PC = REG[int(operands[0][1:])]
+    elif opcode == "BGE":
+      if REG[int(operands[1][1:])] >= REG[int(operands[2][1:])]:
+        PC = REG[int(operands[0][1:])]
+    elif opcode == "MOV":
+      REG[int(operands[0][1:])] = REG[int(operands[1][1:])]
+    elif opcode == "NOT":
+      REG[int(operands[0][1:])] = ~REG[int(operands[1][1:])] % 2**(BITS)
     elif opcode == "INC":
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + 1
       updateFlags(int(operands[0][1:]))
@@ -199,8 +196,6 @@ def getState(program_input, databuswidth):
     elif opcode == "RSH":
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] // 2
       updateFlags(int(operands[0][1:]))
-      if REG[int(operands[1][1:])] // 2 < REG[int(operands[1][1:])] / 2:
-        FLAG["CF"] = True
     elif opcode == "LSH":
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] * 2
       updateFlags(int(operands[0][1:]))
@@ -222,10 +217,6 @@ def getState(program_input, databuswidth):
     elif opcode == "XNOR":
       REG[int(operands[0][1:])] = ~(REG[int(operands[1][1:])] | REG[int(operands[2][1:])]) % 2**(BITS)
       updateFlags(int(operands[0][1:]))
-    elif opcode == "MOV":
-      REG[int(operands[0][1:])] = REG[int(operands[1][1:])]
-    elif opcode == "NOT":
-      REG[int(operands[0][1:])] = ~REG[int(operands[1][1:])] % 2**(BITS)
     elif opcode == "IN":
       try:
         if operands[1] == "%RNG":
@@ -250,42 +241,12 @@ def getState(program_input, databuswidth):
         PIX_DISPLAY[PIX_DISPLAY_Y][PIX_DISPLAY_X] = draw
       else:
         OUTPUT.append(REG[int(operands[1][1:])])
-    elif opcode == "BRC":
-      if FLAG["CF"]:
-        if operands[0][0] == "$":
-          PC = REG[int(operands[0][1:])]
-        else:
-          PC = LABEL[operands[0]]
-    elif opcode == "BNC":
-      if not FLAG["CF"]:
-        if operands[0][0] == "$":
-          PC = REG[int(operands[0][1:])]
-        else:
-          PC = LABEL[operands[0]]
     elif opcode == "BRZ":
-      if FLAG["ZF"]:
-        if operands[0][0] == "$":
-          PC = REG[int(operands[0][1:])]
-        else:
-          PC = LABEL[operands[0]]
+      if REG[int(operands[1][1:])] == 0:
+        PC = REG[int(operands[0][1:])]
     elif opcode == "BNZ":
-      if not FLAG["ZF"]:
-        if operands[0][0] == "$":
-          PC = REG[int(operands[0][1:])]
-        else:
-          PC = LABEL[operands[0]]
-    elif opcode == "BRN":
-      if FLAG["NF"]:
-        if operands[0][0] == "$":
-          PC = REG[int(operands[0][1:])]
-        else:
-          PC = LABEL[operands[0]]
-    elif opcode == "BRP":
-      if not FLAG["NF"]:
-        if operands[0][0] == "$":
-          PC = REG[int(operands[0][1:])]
-        else:
-          PC = LABEL[operands[0]]
+      if REG[int(operands[1][1:])] != 0:
+        PC = REG[int(operands[0][1:])]
     elif opcode == "HLT":
       break
     elif opcode == "NOP":
@@ -328,13 +289,7 @@ def getState(program_input, databuswidth):
         columns[1].append(f"├ {x:>{maxwidth}}: {val}")
     if not flg2:
       columns[1].append(f"├ {'(all empty)':>{maxwidth}}")
-    columns[2].append(f"      - Flags")
-    columns[2].append(f"├ CF : ON" if FLAG["CF"] else "├ CF : OFF")
-    columns[2].append(f"├ ZF : ON" if FLAG["ZF"] else "├ ZF : OFF")
-    columns[2].append(f"├ OF : ON" if FLAG["OF"] else "├ OF : OFF")
-    columns[2].append(f"├ NF : ON" if FLAG["NF"] else "├ NF : OFF")
-    columns[2].append("")
-    columns[2].append(f"- Headers")
+    columns[2].append(f"      - Headers")
     columns[2].append(f"├ MINREG: {rcnt}")
     columns[2].append(f"├ MINRAM: {mcnt}")
     columns[2].append(f"├ MINSTK: {scnt}")
