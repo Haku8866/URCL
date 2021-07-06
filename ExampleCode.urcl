@@ -1,53 +1,15 @@
-// See if you can get this bubble sort algorithm to run on your CPU!
-// Bubble sort has a time complexity of O(n^2), and it sorts an array of size 2**(bits/2), so it might take a while to finish.
-// As it's running the worst case scenario, you can expect ~2300 URCL instructions to be executed for an 8-bit CPU (array size 16). 
+// See if you can get the MLT instruction to run on your CPU!
+// In the end, you should get this:
+// $1: 3
+// $2: 5
+// $3: 15
 
-MINRAM &(0)(1)+1
+MINRAM 0
 MINREG 3
+BITS >= 4
 
-IMM $1, #0
-IMM $2, &(0)(1)
-.fill_array
-STR $1, $2
-INC $1, $1
-DEC $2, $2
-BNC .fill_array
-IMM $1, #0
-IMM $2, &(0)(1)
-CAL .bubbleSort($1, $2)
+IMM $1, 3
+IMM $2, 5
+IMM $3, 0
+MLT $3, $2, $1
 HLT
-
-NAME bubbleSort
-OPS 2
-IN 2
-REG 3
-STR #0, $1
-STR #1, $2
-STR #3, $2
-.loop0
-LOD $1, #0
-LOD $2, #3
-BZR .skip2, $2
-STR #4, $2
-.loop1
-LOD $2, $1
-INC $1, $1
-LOD $3, $1
-DEC $1, $1
-BGE .skip, $2, $3
-STR $1, $3
-INC $1, $1
-STR $1, $2
-DEC $1, $1
-.skip
-INC $1, $1
-LOD $2, #4
-DEC $2, $2
-STR #4, $2
-BNZ .loop1
-.skip2
-LOD $2, #3
-DEC $2, $2
-STR #3, $2
-BNC .loop0
-RET
