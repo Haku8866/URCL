@@ -2,55 +2,60 @@ CPU_stats = {
   "REGISTERS":"",
   "MEMORY": "",
   "DATABUS_WIDTH": "",
-  "RUN_RAM": False,
-  "MANUAL_LABEL_REMOVAL": False,
-  "SP_IS_REG": True,
-  "SP_LOCATION": 0,
-  "FLIPPED_STACK": False,
-  "STACK_START": 0,
-  "MANUAL_SP_REMOVAL": False,
+  "RUN_RAM": True,
+  "REMOVE_LABELS": False,
+  "SHIFT_RAM": False,
+  "SP_LOCATION": "",
+  "SP_IS_GPR": True,
+  "REVERSED_STACK": False,
+  "SP_VALUE": "",
+  "KEEP_SP": False,
   }
 Instruction_table = {
-    "ADD":   [True, ""],
-    "SUB":   [True, ""],
-    "RSH":   [True, ""],
-    "LSH":   [True, ""],
-    "INC":   [True, ""],
-    "DEC":   [True, ""],
-    "MOV":   [True, ""],
-    "XOR":   [True, ""],
-    "AND":   [True, ""],
-    "OR":    [True, ""],
-    "NOR":   [True, ""],
-    "NAND":  [True, ""],
-    "XNOR":  [True, ""],
-    "NOT":   [True, ""],
-    "IMM":   [True, ""], # <B> will be an immediate
-    "LOD":   [True, ""],
-    "STR":   [True, ""],
-    "JMP":   [True, ""],
-    "BRC":   [True, ""],
-    "BNC":   [True, ""],
-    "BRZ":   [True, ""],
-    "BNZ":   [True, ""],
-    "BRN":   [True, ""],
-    "BRP":   [True, ""],
-    "NOP":   [True, ""],
-    "HLT":   [True, ""],
-    "DW":    [True, ""], # Only for RUN RAM
-    "IN":    [True, ""], # <B> will be an immediate (port)
-    "OUT":   [True, ""], # <A> will be an immediate (port)
-    }
-from URCL import instruction
-def RemoveLabels(code):
-    return code
-def getProgramLength(code):
-    return 0
-def RawURCL(code):
-    return code
-def CleanURCL(code, instructions):
-    return code, instructions
+  # Bare minimum, fill in all of these
+  "ADD": [],
+  "IMM": [], # <B> will be an immediate (number)
+  "BGE": [],
+  "LOD": [],
+  "STR": [],
+  "RSH": [],
+  "NOR": [],
+  # Required, but less common
+  "IN":  [], # <B> will be an immediate (port)
+  "OUT": [], # <A> will be an immediate (port)
+  "DW":  [], # Only for RUN RAM
+  # Strongly recommended
+  "SUB": [],
+  "JMP": [],
+  "MOV": [],
+  "INC": [],
+  "DEC": [],
+  "HLT": [],
+  "BRZ": [],
+  "BNZ": [],
+  "BOD": [],
+  "BEV": [],
+  "STR_ri": [],
+  # Recommended
+  "AND": [],
+  "OR": [],
+  "XOR": [],
+  "PSH": [],
+  "POP": [],
+  "LSH": [],
+  "CAL": [],
+  "RET": [],
+  }
+Port_table = {
+  "%NUMB": 0,
+  "%TEXT": 0
+}
+from URCL import instruction, opcode, operand
+def RawURCL(a, b):
+  return a, b
+def CleanURCL(a, b):
+  return a, b
 def LabelISA(code):
-    return code
+  return code
 def FinalISA(code):
-    return code
+  return code

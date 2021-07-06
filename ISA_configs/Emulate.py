@@ -1,56 +1,43 @@
 CPU_stats = {
-  "REGISTERS":"8",
+  "REGISTERS":"7",
   "MEMORY": "256",
   "DATABUS_WIDTH": "8",
   "RUN_RAM": True,
-  "MANUAL_LABEL_REMOVAL": False,
-  "SP_IS_REG": True,
-  "SP_LOCATION": 255,
-  "FLIPPED_STACK": False,
-  "STACK_START": 0,
-  "MANUAL_SP_REMOVAL": False,
+  "REMOVE_LABELS": False,
+  "SHIFT_RAM": False,
+  "SP_LOCATION": "0",
+  "SP_IS_GPR": True,
+  "REVERSED_STACK": False,
+  "SP_VALUE": "0",
+  "KEEP_SP": False,
   }
 Instruction_table = {
-    "ADD":   [True, ""],
-    "SUB":   [True, ""],
-    "RSH":   [True, ""],
-    "LSH":   [True, ""],
-    "INC":   [True, ""],
-    "DEC":   [True, ""],
-    "MOV":   [True, ""],
-    "XOR":   [True, ""],
-    "AND":   [True, ""],
-    "OR":    [True, ""],
-    "NOR":   [True, ""],
-    "NAND":  [True, ""],
-    "XNOR":  [True, ""],
-    "NOT":   [True, ""],
-    "IMM":   [True, ""], # <B> will be an immediate
-    "LOD":   [True, ""],
-    "STR":   [True, ""],
-    "JMP":   [True, ""],
-    "BRC":   [True, ""],
-    "BNC":   [True, ""],
-    "BRZ":   [True, ""],
-    "BNZ":   [True, ""],
-    "BRN":   [True, ""],
-    "BRP":   [True, ""],
-    "NOP":   [True, ""],
-    "HLT":   [True, ""],
-    "DW":    [True, ""], # Only for RUN RAM
-    "IN":    [True, ""], # <B> will be an immediate (port)
-    "OUT":   [True, ""], # <A> will be an immediate (port)
-    }
-from URCL import instruction
-def RemoveLabels(code):
-    return code
-def getProgramLength(code):
-    return 0
-def RawURCL(code):
-    return code
-def CleanURCL(code, instructions):
-    return code, instructions
-def LabelISA(code):
-    return code
-def FinalISA(code):
-    return code
+  "ADD":  [1],
+  #"SUB":  [1],
+  "RSH":  [1],
+  #"LSH":  [1],
+  #"INC":  [1],
+  #"DEC":  [1],
+  #"MOV":  [1],
+  #"XOR":  [1],
+  #"AND":  [1],
+  #"OR":   [1],
+  "NOR":  [1],
+  #"NAND": [1],
+  #"XNOR": [1],
+  #"NOT":  [1],
+  "IMM":  [1], # <B> will be an immediate
+  "LOD":  [1],
+  "STR":  [1],
+  #"JMP":  [1],
+  #"BRZ":  [1],
+  #"BNZ":  [1],
+  #"NOP":  [1],
+  "BGE":  [1],
+  #"HLT":  [1],
+  "DW":   [1], # Only for RUN RAM
+  "IN":   [1], # <B> will be an immediate (port)
+  "OUT":  [1], # <A> will be an immediate (port)
+  }
+def RawURCL(a, b):return a, b
+def CleanURCL(a, b):return a, b
