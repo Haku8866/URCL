@@ -61,15 +61,15 @@ def convertToInstructions(program):
   global RUNRAM
   global operands
   global labelCount
-  code, label = [], ""
+  code, label = [], []
   for x in range(len(program)):
     operandList, line, operandCount, opcode = ([],program[x].split(),operands.get(program[x].split()[0], None),program[x].split()[0],)
     if line[0][0] == ".":
-      label = " ".join(line)
+      label.append(line[0])
     elif operandCount != None:
       operandList = line[1:]
       code.append(instruction(label, opcode, operandList))
-      label = ""
+      label = []
     else:
       end(f"Unknown instruction '{line[0]}'","- try checking:\n1. Is the file written in the lastest version of URCL?\n2. If so, has anyone raised this missing feature on the URCL discord yet? (https://discord.gg/jWRr2vx)",)
   return list(filter(None, code))
@@ -100,15 +100,17 @@ def getState(program_input, databuswidth):
     "NF": False,
     "OF": False
   }
+  printDisplay = False
   state = ""
   maxaddr = (2**BITS)-1
   maxwidth = len(str(maxaddr))
   program = program_input
   offset = len(program) + 1
   for x,ins in enumerate(program):
-    if LABEL.get(ins.label, None) == None:
-      LABEL[ins.label] = x
-      reverseLABEL[x] = ins.label
+    for l,lbl in enumerate(ins.label):
+      if LABEL.get(lbl, None) == None:
+        LABEL[lbl] = x
+        reverseLABEL[x] = lbl
     if ins.opcode not in ["DW"]:
       RAM.append("-")
     else:
@@ -226,6 +228,7 @@ def getState(program_input, databuswidth):
       except:
         REG[int(operands[0][1:])] = 0
     elif opcode == "OUT":
+      printDisplay = True
       if operands[0] == "%NUMB":
         OUTPUT.append(REG[int(operands[1][1:])])
       elif operands[0] == "%TEXT":
@@ -237,7 +240,7 @@ def getState(program_input, databuswidth):
       elif operands[0] == "%COLOR" or operands[0] == "%COLOUR":
         draw = "  "
         if REG[int(operands[1][1:])] != 0:
-          draw = "##"
+          draw = "██"
         PIX_DISPLAY[PIX_DISPLAY_Y][PIX_DISPLAY_X] = draw
       else:
         OUTPUT.append(REG[int(operands[1][1:])])
@@ -251,6 +254,9 @@ def getState(program_input, databuswidth):
       break
     elif opcode == "NOP":
       pass
+    if not printDisplay:
+      continue
+    printDisplay = False
     columns = [[],[],[],[],[]]
     columns[0].append("\033[1;1H- Memory")
     flg0 = False
@@ -343,11 +349,11 @@ def main():
     print('\x1b[2J')
     state = getState(program, databuswidth)
   except Exception as ex:
-    if ex.__class__ is TypeError:
-      print(f"Null reference exception! You're either:\n - 1) Using a register that hasn't been loaded with an IMM <reg> <val> instruction.\n - 2) Loading a value from memory that hasn't been set with a STR <addr> <val/reg> instruction.\nVariables need to be set before being used, as the CPU won't set everything to 0 before running your program.")
-    elif ex.__class__ is IndexError:
-      print(f"Index out of bounds error! You're either:\n - 1) Using too many registers (this CPU only has {databuswidth}), try using some memory instead.\n - 2) Using too much memory (this CPU only has {2**BITS} words), try making your program more efficient, or target {databuswidth*2} bit CPUs instead.")
-    else:
+    #if ex.__class__ is TypeError:
+    #  print(f"Null reference exception! You're either:\n - 1) Using a register that hasn't been loaded with an IMM <reg> <val> instruction.\n - 2) Loading a value from memory that hasn't been set with a STR <addr> <val/reg> instruction.\nVariables need to be set before being used, as the CPU won't set everything to 0 before running your program.")
+    #elif ex.__class__ is IndexError:
+    #  print(f"Index out of bounds error! You're either:\n - 1) Using too many registers (this CPU only has {databuswidth}), try using some memory instead.\n - 2) Using too much memory (this CPU only has {2**BITS} words), try making your program more efficient, or target {databuswidth*2} bit CPUs instead.")
+    #else:
       print(f"URCL code line: {PC}")
       print(traceback.format_exc())
 if __name__ == "__main__":
