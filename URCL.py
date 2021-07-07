@@ -55,8 +55,6 @@ opcodes = {
   "LOD": ("register", "core"),
   "STR": ("register", "core"),
   "JMP": ("branch", "core"),
-  "BRC": ("branch", "core"),
-  "BNC": ("branch", "core"),
   "BRZ": ("branch", "core"),
   "BNZ": ("branch", "core"),
   "BRN": ("branch", "core"),
@@ -241,8 +239,9 @@ cmplx_subs = {
     "IMM <A>, 0",
     "BRZ +5, <C>",
     "MOV ^1, <C>",
+    "MOV ^2, <B>",
     "DEC ^1, ^1",
-    "ADD <A>, <A>, <B>",
+    "ADD <A>, <A>, ^2",
     "BNZ -2, ^1",
     "NOP"
   ],
@@ -250,9 +249,10 @@ cmplx_subs = {
     "IMM <A>, 0",
     "BRL +5, <B>, <C>",
     "MOV ^1, <B>",
+    "MOV ^2, <C>"
     "INC <A>, <A>",
-    "SUB ^1, ^1, <C>",
-    "BGE -2, <B>, <C>",
+    "SUB ^1, ^1, ^2",
+    "BGE -2, ^1, ^2",
     "NOP"
   ],
   "MOD": [
@@ -400,7 +400,7 @@ def convertOperands(program):
   for x, ins in enumerate(program):
     program[x].opcode = opcode(ins.opcode, *opcodes[ins.opcode])
     for y, lab in enumerate(program[x].label):
-      program[x].label[y] = operand("label", lab[1:])
+      program[x].label[y] = operand("label", lab)
     for y, opr in enumerate(program[x].operandList):
       if opr[0] == "$":
         program[x].operandList[y] = operand("register", int(opr[1:]))
@@ -422,7 +422,7 @@ def convertOperands(program):
         program[x].operandList[y] = operand("tempreg", int(opr[1:]))
       else:
         try:
-          program[x].operandList[y] = operand("number", int(opr))
+          program[x].operandList[y] = operand("number", int(opr, base=0))
         except:
           program[x].operandList[y] = operand("other", opr)
   return program
@@ -573,6 +573,11 @@ def replaceComplex(program):
           translation = copy.deepcopy(cmplx_subs.get(getOperandStructure(ins)))
         lab = copy.deepcopy(ins.label)
         done = False
+        tempmaxtempreg = 0
+        for opr in ins.operandList:
+          if opr.type == "tempreg" and opr.value > tempmaxtempreg:
+            tempmaxtempreg = opr.value
+        MAXTEMPREG += tempmaxtempreg
         if translation != None:
           translation = parseURCL(translation)
           tempmaxtempreg2 = 0
@@ -594,17 +599,17 @@ def replaceComplex(program):
                 translation[z].operandList[w].value += MAXTEMPREG
               elif topr.type == "label":
                 translation[z].operandList[w].value = topr.value + f"__{labelCount}"
-          tempmaxtempreg2 = 0
+          tempmaxtempreg3 = 0
           for z, tins in enumerate(translation):
             for w, topr in enumerate(tins.operandList):
               if topr.type == "tempreg":
-                if topr.value > tempmaxtempreg2:
-                  tempmaxtempreg2 = topr.value
-          original = MAXTEMPREG
-          MAXTEMPREG = tempmaxtempreg2
+                if topr.value > tempmaxtempreg3:
+                  tempmaxtempreg3 = topr.value
+          original3 = MAXTEMPREG
+          MAXTEMPREG = tempmaxtempreg + tempmaxtempreg3
           DEPTH += 1
           translation = replaceComplex(copy.deepcopy(translation))
-          MAXTEMPREG = original
+          MAXTEMPREG = original3
           for y, opr in enumerate(ins.operandList):
             for z, tins in enumerate(translation):
               for w, topr in enumerate(tins.operandList):
@@ -613,6 +618,7 @@ def replaceComplex(program):
         else:
           input(f"Cannot translate:\n  - No URCL or ISA translations are available for {ins.opcode.name}.\nFull instruction:\n  - {ins.opcode.name} {', '.join([str(x.value) for x in ins.operandList])}")
           s.exit()
+        MAXTEMPREG -= tempmaxtempreg
         program = program[:x] + translation + program[x+1:]
         program[x].label += lab
         labelCount += 1
@@ -645,7 +651,7 @@ def regSubstitution(program):
         insert = []
         lab = []
         for y, opr in enumerate(program[x].operandList):
-          if opr.type not in ("register", "SP", "tempreg", "placeholder") and ins.operandList != [] and not (y == 0 and ins.opcode.name == "OUT"):
+          if opr.type not in ("register", "stackPtr", "tempreg", "placeholder") and ins.operandList != [] and not (y == 0 and ins.opcode.name == "OUT"):
             if not hit:
               lab = program[x].label
               program[x].label = []
@@ -840,6 +846,11 @@ def checkStackUsage(program):
 def fixStack(program):
   # Flips the stack if necessary, and prunes "SP" if necessary
   global MAXREG
+  for x, ins in enumerate(program):
+    for y, opr in enumerate(ins.operandList):
+      if opr.type == "register":
+        if opr.value > MAXREG:
+          MAXREG = opr.value
   swapped = {
     "INC":"DEC",
     "DEC":"INC",
@@ -914,7 +925,7 @@ def fixPorts(program):
   for x, ins in enumerate(program):
     for y, opr in enumerate(program[x].operandList):
       if opr.type == "port":
-        program[x].operandList[y] = operand("number", ISA.Port_table.get(opr.value))
+        program[x].operandList[y] = operand("number", ISA.Port_table.get("%" + opr.value))
   return program
 
 def main():
@@ -938,12 +949,12 @@ def main():
       if opr.type == "register":
         if opr.value > MAXREG:
           MAXREG = opr.value
+  program = replaceTempReg(program)
   if STACKUSAGE:
     program = fixStack(program)
   program = optimise(program)
-  program = replaceTempReg(program)
   try: program, opcodes = ISA.CleanURCL(program, opcodes)
-  except Exception as ex: end(ex,"- no suggestions, problem with ISA designer's raw URCL tweaks. Report this to them if necessary.")
+  except Exception as ex: end(ex,"- no suggestions, problem with ISA designer's clean  URCL tweaks. Report this to them if necessary.")
   max_y = os.get_terminal_size().lines
   print(f"\nURCL code:")
   for x, ins in enumerate(program):
@@ -961,7 +972,7 @@ def main():
       outfile.write(ins.opcode.name + " " + ", ".join([prefixes.get(opr.type, "") + str(opr.value) for opr in ins.operandList]) + "\n")
   outfile.close()
   print(f"URCL code dumped in: {filename}")
-  if ISA.__name__ == "ISA_configs.Emulate":
+  if ISA.__name__ in ("ISA_configs.Emulate","ISA_configs.Core"):
       return
   program = fixPorts(program)
   program = convertToISA(program)
@@ -972,7 +983,7 @@ def main():
   if ISA.CPU_stats["SHIFT_RAM"] and ISA.CPU_stats["RUN_RAM"]:
     program = shiftRAM(program)
   try:program = ISA.FinalISA(program)
-  except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's labelled ISA tweaks. Report this to them if necessary.")
+  except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's final ISA tweaks. Report this to them if necessary.")
   print(f"\n{ISA.__name__} code:")
   for x, line in enumerate(program):
     if line.label != []:
