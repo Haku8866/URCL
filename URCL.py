@@ -1433,9 +1433,7 @@ def main():
   except Exception as ex: end(ex,"- no suggestions, problem with ISA designer's clean  URCL tweaks. Report this to them if necessary.")
   max_y = os.get_terminal_size().lines
   if WORDS > 1 and MWADDR or MWLABEL:
-    print(f"MULTI-WORD BODGE APPLIED, WORDS: {WORDS}")
-  for x, ptr in enumerate(POINTERS):
-    print(f"POINTER: P{x+1} | {', '.join([f'^{treg}' for treg in ptr])}")
+    print(f"MULTI-WORD PATCH APPLIED, WORDS: {WORDS}")
   print(f"\nURCL code:")
   for x, ins in enumerate(program):
     printIns(ins)
