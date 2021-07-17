@@ -682,6 +682,7 @@ def replaceComplex(program):
   global WORDS
   global BITS
   global TEMPREGPTR
+  global MWLABEL
   global ptrs
   done = False
   alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -738,34 +739,34 @@ def replaceComplex(program):
               ]
             translation += [".end", "NOP"]
           elif opc == "MULTI_ADD":
-            translation += ["@^", "IMM ^1, &(1)"]
+            translation += ["@^", "IMM ^1, 0"]
             for w in range(1, WORDS):
               translation += [
-                f"BNZ .skipinc{w}, ^1",
+                f"BRZ .skipinc{w}, ^1",
                 f"INC <A>[{w}], <A>[{w}]",
                 f"SETNE ^1, 0",
                 f".skipinc{w}",
                 f"ADD <A>[{w}], <A>[{w}], <B>[{w}]",
-                f"BGE .skipset{w}, <B>[{w}], <A>[{w}]",
-                f"BRZ .skipset{w}, ^1",
+                f"BRL .skipset{w}, <B>[{w}], <A>[{w}]",
                 f"IMM ^1, &(1)",
                 f".skipset{w}",
               ]
             translation += ["@V"]
           elif opc == "MULTI_SUB":
-            print("WARNING: This translation is not complete, and is unstable!")
             translation += ["@^", "IMM ^1, 0"]
             for w in range(1, WORDS):
               translation += [
-                f"BNZ .skipdec{w}, ^1",
+                f"BRZ .skipdec{w}, ^1",
                 f"DEC <A>[{w}], <A>[{w}]",
                 f"SETNE ^1, &(1)",
                 f".skipdec{w}",
-                f"SUB <A>[{w}], <A>[{w}], <B>[{w}]",
-                f"BGE .skipset{w}, <A>[{w}], <B>[{w}]",
-                f"BRZ .skipset{w}, ^1",
+                f"@^"
+                f"SUB ^2, <A>[{w}], <B>[{w}]",
+                f"BLE .skipset{w}, ^2, <A>[{w}]",
+                f"@V",
                 f"IMM ^1, &(1)",
                 f".skipset{w}",
+                f"SUB <A>[{w}], <A>[{w}], <B>[{w}]"
               ]
             translation += "@V"
           elif opc == "SUB":
@@ -789,36 +790,44 @@ def replaceComplex(program):
           elif opc == "LLOD":
             if (ins.operandList[0].type, ins.operandList[0].value) in ptrs:
               translation += [
+                "@^",
                 "@PTR ^1",
                 "MULTI_ADD ^1, <B>, <C>",
                 "MULTI_LOD <A>, ^1",
                 "@UNPTR ^1",
+                "@V"
               ]
             else:
               translation += [
+                "@^",
                 "@PTR ^1",
                 "MULTI_ADD ^1, <B>, <C>",
                 "LOD <A>, ^1",
                 "@UNPTR ^1",
+                "@V"
               ]
           elif opc == "LSTR":
             if (ins.operandList[0].type, ins.operandList[0].value) in ptrs:
               translation += [
+                "@^",
                 "@PTR ^1",
                 "MULTI_ADD ^1, <B>, <C>",
                 "MULTI_STR ^1, <A>",
                 "@UNPTR ^1",
+                "@V"
               ]
             else:
               translation += [
+                "@^",
                 "@PTR ^1",
                 "MULTI_ADD ^1, <B>, <C>",
                 "STR ^1, <A>",
                 "@UNPTR ^1",
+                "@V",
               ]
           elif opc == "LOD":
             if ins.operandList[0].equals(ins.operandList[1]):
-              translation += ["@PTR ^1"]
+              translation += ["@^","@PTR ^1"]
               target = "^1"
             else:
               target = "<A>"
@@ -829,7 +838,7 @@ def replaceComplex(program):
               ]
             translation += [f"MULTI_MULTI_SUB <B>, {MINRAM*WORDS}"]
             if ins.operandList[0].equals(ins.operandList[1]):
-              translation += ["MULTI_MOV <A>, ^1","@UNPTR ^1"]
+              translation += ["MULTI_MOV <A>, ^1","@UNPTR ^1","@V"]
           elif opc == "STR":
             for w in range(WORDS):
               translation += [
@@ -841,7 +850,33 @@ def replaceComplex(program):
             for w in range(WORDS):
               translation.append(f"{opc} <A>[{w}], <B>[{w}]")
         else:
-          if cmplx_subs.get(getOperandStructure(ins)) == None or ins.opcode.name == "NOP":
+          translation = []
+          if ins.opcode.name in ("CAL", "RET") and MWLABEL:
+            if ins.opcode.name == "CAL":
+              for w in range(WORDS):
+                translation += [
+                  f"PSH .ret[{w}]",
+                ]
+              translation += [
+                "JMP <A>",
+                ".ret",
+                "NOP"
+              ]
+            if ins.opcode.name == "RET":
+              translation += [
+                "@^",
+                "@PTR ^1"
+              ]
+              for w in range(WORDS):
+                translation += [
+                  f"POP ^1[{WORDS-1-w}]"
+                ]
+              translation += [
+                "JMP ^1",
+                "@UNPTR ^1",
+                "@V"
+              ]
+          elif cmplx_subs.get(getOperandStructure(ins)) == None or ins.opcode.name == "NOP":
             if cmplx_subs.get(ins.opcode.name) == None or ins.opcode.name == "NOP":
               continue
             else:
@@ -852,7 +887,6 @@ def replaceComplex(program):
         done = False
         if translation != None:
           translation = parseURCL(translation)
-          translation = convertMultiWordInstructions(translation)
           translation = regSubstitution(translation)
           translation = replaceComplex(copy.deepcopy(translation))
           for z, tins in enumerate(translation):
@@ -904,6 +938,9 @@ def regSubstitution(program):
   global MAXREG
   global MAXTEMPREG
   global TEMPREGPTR
+  global MWLABEL
+  global WORDS
+  global FINALSUB
   done = False
   exempt = ("IMM", "header", "pragma", "IN", "MULTI_IMM")
   while not done:
@@ -920,8 +957,13 @@ def regSubstitution(program):
         hit = False
         insert = []
         lab = []
+        postinsert = []
         for y, opr in enumerate(program[x].operandList):
           if opr.type not in ("register", "stackPtr", "tempreg", "placeholder") and ins.operandList != [] and not (y == 0 and ins.opcode.name == "OUT"):
+            if opr.type == "label" and y == 0 and ins.opcode.type == "branch" and MWLABEL and WORDS > 1 and not FINALSUB:
+              continue
+            if FINALSUB and opr.type == "label" and y == 0 and ins.opcode.type == "branch":
+              printIns(ins)
             if not hit:
               lab = program[x].label
               program[x].label = []
@@ -929,19 +971,19 @@ def regSubstitution(program):
               done = False
             if (opr.type, opr.value, opr.word) not in swap:
               swap.append((opr.type, opr.value, opr.word))
-            postinsert = []
             for s, val in enumerate(swap):
               if val == (opr.type, opr.value, opr.word):
                 insert += [
-                    instruction([], opcode("@^", "pragma", "other"), []),
+                    instruction([], opcode("@^", "pragma", "other"), [operand("tempreg", s+1+tempregptr)]),
                     instruction([], opcode("IMM", "register", "core"), [operand("tempreg", s+1+tempregptr), operand(*val)]),
                   ]
+                postinsert.append(instruction([], opcode("@V", "pragma", "other"), []))
                 program[x].operandList[y] = operand("tempreg", s+1+tempregptr)
-        for s in swap:
-          postinsert.append(instruction([], opcode("@V", "pragma", "other"), []))
         if hit:
           program = program[:x] + insert + [program[x]] + postinsert + program[x+1:]
           program[x].label = lab
+          if FINALSUB and ins.opcode.type == "branch":
+              printIns(ins)
           break
   return program
 
@@ -950,6 +992,8 @@ def replaceTempReg(program):
   global MAXREG
   global WORDS
   global POINTERS
+  global MWADDR
+  global MWSP
   global ptrs
   maxptr = 0
   for x, ins in enumerate(program):
@@ -964,16 +1008,25 @@ def replaceTempReg(program):
     for y, opr in enumerate(ins.operandList):
       if opr.type == "tempreg" and opr.value > tempmaxtempreg:
         tempmaxtempreg = opr.value
+  for x, ins in enumerate(program):
+    for y, opr in enumerate(program[x].operandList):
+      if opr.type == "tempreg":
+        program[x].operandList[y].type = "register"
+        program[x].operandList[y].value += MAXREG
+  MAXREG = 0
+  for x, ins in enumerate(program):
+    for y, opr in enumerate(ins.operandList):
+      if opr.type == "register":
+        if opr.value > MAXREG:
+          MAXREG = opr.value
   if WORDS > 1:
-    regList = [x for x in range(tempmaxtempreg+1, tempmaxtempreg+(WORDS-1)*5)]
+    regList = [x for x in range(1, 1+(WORDS-1)*10)]
     pointerList = [regList[(WORDS-1)*x:(WORDS-1)*(x+1)] for x in range(int(len(regList)/(WORDS-1)))]
   for x, ins in enumerate(program):
     if ins.opcode.name == "@PTR":
       ptrs.append((ins.operandList[0].type, ins.operandList[0].value))
-      continue
     elif ins.opcode.name == "@UNPTR":
       ptrs.remove((ins.operandList[0].type, ins.operandList[0].value))
-      continue
     for y, opr in enumerate(program[x].operandList):
       if opr.type == "register" and opr.word > 0:
         val = (opr.type, opr.value)
@@ -981,19 +1034,11 @@ def replaceTempReg(program):
         program[x].operandList[y] = operand("tempreg", tregs[opr.word-1])
         program[x].operandList[y].word = 0
         opr = program[x].operandList[y]
-      if opr.type == "stackPtr" and opr.word > 0:
+      if opr.type == "stackPtr" and opr.word > 0 and MWSP:
         tregs = copy.deepcopy(pointerList[maxptr])
         program[x].operandList[y] = operand("tempreg", tregs[opr.word-1])
         opr = program[x].operandList[y]
-      if opr.type == "tempreg":
-        program[x].operandList[y].type = "register"
-        program[x].operandList[y].value += MAXREG
-      if opr.type == "register" and opr.word > 0:
-        val = (opr.type, opr.value)
-        tregs = copy.deepcopy(pointerList[ptrs.index(val)])
-        program[x].operandList[y] = operand("tempreg", tregs[opr.word-1])
-        program[x].operandList[y].word = 0
-        opr = program[x].operandList[y]
+    for y, opr in enumerate(program[x].operandList):
       if opr.type == "tempreg":
         program[x].operandList[y].type = "register"
         program[x].operandList[y].value += MAXREG
@@ -1253,6 +1298,8 @@ def initialiseGlobals():
   ptrs = []
   global TEMPREGPTR
   TEMPREGPTR = 0
+  global FINALSUB
+  FINALSUB = False
   return
 
 def removeISALabels(program):
@@ -1342,8 +1389,6 @@ def enableMultiWord(program):
         ins.opcode.name = "MULTI_" + ins.opcode.name
       elif ins.opcode.name in ("LOD") and ((ins.operandList[0].type, ins.operandList[0].value) in ptrs or (opr.type == "stackPtr" and MWSP) or ins.operandList[0].type == "memAddr"):
         ins.opcode.name = "MULTI_" + ins.opcode.name
-
-  program = convertMultiWordInstructions(program)
   return program
 
 def convertMultiWordInstructions(program):
@@ -1360,7 +1405,7 @@ def convertMultiWordInstructions(program):
     8: "OCTO_",
     16: "SEDEC_",
     32: "DUOTRIGINTI_",
-    64: "QUATTOURSEXAGINTI_",
+    64: "QUATTUORSEXAGINTI_",
     128: "OCTOVIGINTICENTI_",
   }
   global BITS
@@ -1392,7 +1437,7 @@ def convertMultiWordInstructions(program):
         ins.operandList = [operand(ins.operandList[0].type, ins.operandList[0].value, WORDS-y-1) for y in range(WORDS)] + ins.operandList[1:]
         ins.opcode.name = prefixList[WORDS] + ins.opcode.name
       elif ins.opcode.name == "LOD":
-        ins.operandList = [ins.operandList[0]] + [operand(ins.operandList[0].type, ins.operandList[1].value, WORDS-y-1) for y in range(WORDS)]
+        ins.operandList = [ins.operandList[0]] + [operand(ins.operandList[1].type, ins.operandList[1].value, WORDS-y-1) for y in range(WORDS)]
         ins.opcode.name = prefixList[WORDS] + ins.opcode.name
   return program
 
@@ -1402,6 +1447,7 @@ def main():
   global MAXREG  
   global MWADDR
   global MWLABEL
+  global FINALSUB
   if len(s.argv) > 2:
     program = importProgram(s.argv[2])
   else:
@@ -1413,6 +1459,10 @@ def main():
   program = enableMultiWord(program)
   program = regSubstitution(program)
   program = replaceComplex(program)
+  program = convertMultiWordInstructions(program)
+  FINALSUB = True
+  program = regSubstitution(program)
+  FINALSUB = False
   checkStackUsage(program)
   MAXREG = 0
   cnt = 0
