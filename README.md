@@ -17,6 +17,7 @@ You may also run the file without any parameters by simply entering:
 py URCL.py
 ```
 Additionally, you can use the special `Emulate` ISA to just use the URCL-simplification feature.
+Similarly, the special `Core` ISA produces code consisting of only core instructions.
 The resulting code can be used with the included `URCL_Emulator.py`, which allows you to test the URCL program to find any bugs.
 ```
 py URCL_emulator.py <bits> <URCLoutput.urcl>
@@ -31,8 +32,7 @@ Here's a list of things the compiler does for you:
  . Converts all constants and bit patterns to base-10.
  . Replaces all relative addresses with labels.
  . Replaces unsupported complex instructions with supported core instructions.
- . Expands function calls, ensuring register preservation.
- . Optimises the URCL code where possible, using memory instead of the stack in some cases.
+ . Optional multi-word support.
 
 # How to get a URCL -> your ISA compiler working
 There's an ExampleISA.py config file provided, this is roughly what a config file will look like, based off my own HPU4 instruction set.
