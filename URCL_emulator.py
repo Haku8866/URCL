@@ -254,7 +254,7 @@ def getState(program_input, databuswidth):
       break
     elif opcode == "NOP":
       pass
-    if not printDisplay:
+    if not printDisplay and not step:
       continue
     printDisplay = False
     columns = [[],[],[],[],[]]
