@@ -1,8 +1,10 @@
 import URCL
-URCL.opcodes["DBLE_BGE"] = ("branch", "other")
-from URCL import parseURCL,importProgram,printIns
+URCL.opcodes["DBLE_BGE"] = ("branch", "core")
+URCL.opcodes["DBLE_LOD"] = ("register", "core")
+URCL.opcodes["DBLE_STR"] = ("register", "core")
+from URCL import parseURCL,importProgram,printIns,operand
 from random import randint
-import sys, traceback, colorama
+import sys, traceback, colorama, time
 from colorama import Fore,Back,Style
 colorama.init(autoreset=True)
 class grid():
@@ -21,16 +23,17 @@ class grid():
 def stringIns(ins):
   prefixes = {"register":"$","memAddr":"#","label":".",}
   return ins.opcode.name + " " + ", ".join([prefixes.get(opr.type, "") + str(opr.value) if opr.word == 0 else prefixes.get(opr.type, "") + str(opr.value) + f"[{opr.word}]" for opr in ins.operandList])
-def main(program,bits,step,show):
+def main(program,bits,step,show,slow):
   for x,ins in enumerate(program):
+    for o,opr in enumerate(ins.operandList):
+      if opr.type in ("number","memAddr"):
+        opr.value = (opr.value>>bits*opr.word)&(2**bits-1)
+        opr.word = 0
     for l,lbl in enumerate(ins.label):
       for y,ins2 in enumerate(program):
         for o,opr in enumerate(ins2.operandList):
           if opr.type=="label" and opr.value == lbl.value:
-            program[y].operandList[o].type="number"
-            program[y].operandList[o].value=(x>>bits*opr.word)&(2**bits-1)
-            program[y].operandList[o].word=0
-            
+            program[y].operandList[o]=operand("number",(x>>bits*opr.word)&(2**bits-1))
   display = grid(4,1,30)
   pc,memory,registers,out=0,{},{},[]
   getreg = lambda a,b:registers[b.operandList[a].value]
@@ -45,10 +48,12 @@ def main(program,bits,step,show):
       elif ins.opcode.name=="LOD":registers[ins.operandList[0].value]=memory[getreg(1,ins)]
       elif ins.opcode.name=="RSH":registers[ins.operandList[0].value]=getreg(1,ins)//2
       elif ins.opcode.name=="BGE" and getreg(1,ins)>=getreg(2,ins):pc=getreg(0,ins)
-      elif ins.opcode.name=="DBLE_BGE" and getreg(2,ins)>=getreg(3,ins):pc=(getreg(0,ins)<<bits)+(getreg(1,ins))
       elif ins.opcode.name=="IN" and ins.operandList[1].value=="%RNG":registers[ins.operandList[0].value]=randint(0,2**bits-1)
       elif ins.opcode.name=="OUT":out.append(getreg(1,ins))
-      if step or show or ins.opcode.name=="OUT":
+      elif ins.opcode.name=="DBLE_BGE" and getreg(2,ins)>=getreg(3,ins):pc=(getreg(0,ins)<<bits)+(getreg(1,ins))
+      elif ins.opcode.name=="DBLE_LOD":registers[ins.operandList[0].value]=memory[(getreg(1,ins)<<bits)+(getreg(2,ins))]
+      elif ins.opcode.name=="DBLE_STR":memory[(getreg(0,ins)<<bits)+(getreg(1,ins))]=getreg(2,ins)
+      if step or show or slow or ins.opcode.name=="OUT":
         display.grid[0]=[f"#{m}: {memory[m]}" for m in memory]
         display.grid[1]=[f"${r[0]}: {r[1]}" for r in sorted(registers.items())]
         display.grid[2]=[f"{o}: {out[o]}" for o in range(len(out))]
@@ -60,11 +65,12 @@ def main(program,bits,step,show):
           display.grid[h][0:0]=[head]
         display.show()
         if step:input()
+        elif slow:time.sleep(1)
   except:
     print(f"URCL code line: {pc}")
     input(traceback.format_exc())
 if __name__ == "__main__":
-  step,show=False,False
+  step,show,slow=False,False,False
   if len(sys.argv) > 1:
     try:bits=int(sys.argv[1])
     except:print(r"Format: py URCL_core_emu.py {bits} {program.urcl} {step/show}")
@@ -74,8 +80,9 @@ if __name__ == "__main__":
     except:print(r"Format: py URCL_core_emu.py {bits} {program.urcl} {step/show}")
   else:program=importProgram(input("PROGRAM NAME: "))
   if len(sys.argv) > 3:
-    if sys.argv[3] == "step":step=True
-    elif sys.argv[3] == "show":show=True
-    else:print(r"Format: py URCL_core_emu.py {bits} {program.urcl} {step/show}")
+    if "step" in sys.argv[3]:step=True
+    elif "show" in sys.argv[3]:show=True
+    elif "slow" in sys.argv[3]:slow=True
+    else:print(r"Format: py URCL_core_emu.py {bits} {program.urcl} {step/show/slow}")
   program=parseURCL(program)
-  main(program,bits,step,show)
+  main(program,bits,step,show,slow)
