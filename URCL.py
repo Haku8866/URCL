@@ -714,6 +714,7 @@ def replaceComplex(program):
                 f"INC <A>[{w}], <A>[{w}]",
                 f"BNZ .end, <A>[{w}]",
               ]
+            translation = translation[:-1]
             translation += [".end", "NOP"]
           elif opc == "DEC":
             translation += ["MULTI_MOV <A>, <B>"]
@@ -722,6 +723,7 @@ def replaceComplex(program):
                 f"DEC <A>[{w}], <A>[{w}]",
                 f"BNE .end, <A>[{w}], &(1)",
               ]
+            translation = translation[:-1]
             translation += [".end", "NOP"]
           elif opc == "ADD":
             translation += [
@@ -737,6 +739,7 @@ def replaceComplex(program):
                 f"INC <A>[{w}], <A>[{w}]",
                 f"BNZ .end, <A>[{w}]",
               ]
+            translation = translation[:-1]
             translation += [".end", "NOP"]
           elif opc == "MULTI_ADD":
             translation += ["@^", "IMM ^1, 0"]
@@ -744,7 +747,7 @@ def replaceComplex(program):
               translation += [
                 f"BRZ .skipinc{w}, ^1",
                 f"INC <A>[{w}], <A>[{w}]",
-                f"SETNE ^1, 0",
+                f"SETNE ^1, <A>, 0",
                 f".skipinc{w}",
                 f"ADD <A>[{w}], <A>[{w}], <B>[{w}]",
                 f"BRL .skipset{w}, <B>[{w}], <A>[{w}]",
@@ -758,9 +761,9 @@ def replaceComplex(program):
               translation += [
                 f"BRZ .skipdec{w}, ^1",
                 f"DEC <A>[{w}], <A>[{w}]",
-                f"SETNE ^1, &(1)",
+                f"SETNE ^1, <A>, &(1)",
                 f".skipdec{w}",
-                f"@^"
+                f"@^",
                 f"SUB ^2, <A>[{w}], <B>[{w}]",
                 f"BLE .skipset{w}, ^2, <A>[{w}]",
                 f"@V",
@@ -768,7 +771,7 @@ def replaceComplex(program):
                 f".skipset{w}",
                 f"SUB <A>[{w}], <A>[{w}], <B>[{w}]"
               ]
-            translation += "@V"
+            translation += ["@V"]
           elif opc == "SUB":
             translation += [
               "MULTI_MOV <A>, <B>",
@@ -786,6 +789,7 @@ def replaceComplex(program):
                 f"DEC <A>[{w}], <A>[{w}]",
                 f"BNE .end, <A>[{w}], &(1)",
               ]
+            translation = translation[:-1]
             translation += [".end", "NOP"]
           elif opc == "LLOD":
             if (ins.operandList[0].type, ins.operandList[0].value) in ptrs:
@@ -888,24 +892,24 @@ def replaceComplex(program):
         if translation != None:
           translation = parseURCL(translation)
           translation = regSubstitution(translation)
-          translation = replaceComplex(copy.deepcopy(translation))
+          #translation = replaceComplex(copy.deepcopy(translation))
           for z, tins in enumerate(translation):
             for w, tlab in enumerate(tins.label):
               if tlab.value != "":
                 translation[z].label[w].value = tlab.value + f"__{labelCount}"
             for w, topr in enumerate(tins.operandList):
               if topr.type == "tempreg":
-                translation[z].operandList[w].value += tempregptr
+                topr.value += tempregptr
               elif topr.type == "label":
-                translation[z].operandList[w].value = topr.value + f"__{labelCount}"
+                topr.value = topr.value + f"__{labelCount}"
           for y, opr in enumerate(ins.operandList):
             for z, tins in enumerate(translation):
               for w, topr in enumerate(tins.operandList):
                 if topr.type == "placeholder" and topr.value == alphabet[y]:
-                  translation[z].operandList[w].type = opr.type
-                  translation[z].operandList[w].value = opr.value
-                  if translation[z].operandList[w].word == 0:
-                    translation[z].operandList[w].word = opr.word
+                  topr.type = opr.type
+                  topr.value = opr.value
+                  if topr.word == 0:
+                    topr.word = opr.word
           TEMPREGPTR = tempregptr
           DEPTH += 1
         else:
@@ -942,7 +946,7 @@ def regSubstitution(program):
   global WORDS
   global FINALSUB
   done = False
-  exempt = ("IMM", "header", "pragma", "IN", "MULTI_IMM")
+  exempt = ("IMM", "header", "pragma", "IN", "MULTI_IMM", "MULTI_MULTI_ADD", "MULTI_MULTI_SUB")
   while not done:
     done = True
     tempregptr = 0
@@ -962,8 +966,6 @@ def regSubstitution(program):
           if opr.type not in ("register", "stackPtr", "tempreg", "placeholder") and ins.operandList != [] and not (y == 0 and ins.opcode.name == "OUT"):
             if opr.type == "label" and y == 0 and ins.opcode.type == "branch" and MWLABEL and WORDS > 1 and not FINALSUB:
               continue
-            if FINALSUB and opr.type == "label" and y == 0 and ins.opcode.type == "branch":
-              printIns(ins)
             if not hit:
               lab = program[x].label
               program[x].label = []
@@ -974,7 +976,7 @@ def regSubstitution(program):
             for s, val in enumerate(swap):
               if val == (opr.type, opr.value, opr.word):
                 insert += [
-                    instruction([], opcode("@^", "pragma", "other"), [operand("tempreg", s+1+tempregptr)]),
+                    instruction([], opcode("@^", "pragma", "other"), []),
                     instruction([], opcode("IMM", "register", "core"), [operand("tempreg", s+1+tempregptr), operand(*val)]),
                   ]
                 postinsert.append(instruction([], opcode("@V", "pragma", "other"), []))
@@ -982,8 +984,6 @@ def regSubstitution(program):
         if hit:
           program = program[:x] + insert + [program[x]] + postinsert + program[x+1:]
           program[x].label = lab
-          if FINALSUB and ins.opcode.type == "branch":
-              printIns(ins)
           break
   return program
 
@@ -1229,9 +1229,26 @@ def checkStackUsage(program):
         break
   return
 
+def setupStack(program):
+  global MAXREG
+  global MWSP
+  global WORDS
+  global BITS
+  newSP = int(ISA.CPU_stats["SP_LOCATION"])
+  if newSP == 0:
+    newSP = MAXREG + 1
+  if MWSP:
+    val = int(ISA.CPU_stats["SP_VALUE"])
+    for w in range(WORDS):
+      program[0:0] = [instruction([], opcode("IMM", "register", "core"), [operand("stackPtr", "", w), operand("number", (val>>BITS*w)&(2**BITS-1))])]
+  return program
+
 def fixStack(program):
   # Flips the stack if necessary, and prunes "SP" if necessary
   global MAXREG
+  global MWSP
+  global WORDS
+  global BITS
   for x, ins in enumerate(program):
     for y, opr in enumerate(ins.operandList):
       if opr.type == "register":
@@ -1246,7 +1263,6 @@ def fixStack(program):
   newSP = int(ISA.CPU_stats["SP_LOCATION"])
   if newSP == 0:
     newSP = MAXREG + 1
-  program = [instruction([], opcode("IMM", "register", "core"), [operand("stackPtr"), operand("number", int(ISA.CPU_stats["SP_VALUE"]))])] + copy.deepcopy(program)
   for x, ins in enumerate(program):
     if ins.opcode.name in ("DEC","INC","ADD","SUB") and ISA.CPU_stats["REVERSED_STACK"]:
       program[x].opcode.name = swapped[ins.opcode.name]
@@ -1475,6 +1491,8 @@ def main():
       if opr.type == "register":
         if opr.value > MAXREG:
           MAXREG = opr.value
+  if STACKUSAGE:
+    program = setupStack(program)
   program = replaceTempReg(program)
   if STACKUSAGE:
     program = fixStack(program)
