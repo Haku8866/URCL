@@ -25,6 +25,24 @@ py URCL_emulator.py <bits> <URCLoutput.urcl>
 The `<bits>` parameter is optional, as is `<URCLoutput.urcl>`.
 As with URCL.py, you cannot have `<URCLoutput.urcl>` without specifying `<bits>`.
 
+# Pragmas
+There are some pragmas specific to this compiler which I have defined, these are not official, but they are used as follows:
+```
+@PTR {reg}
+  {code where reg is used as a pointer}
+@UNPTR {reg}
+```
+This defines a register as a pointer, which means if multiword addressing is enabled and used, this register may be treated in a special way.
+Pointers can only be used in: ADD, SUB, INC, DEC, IMM, MOV, LOD, STR, LLOD, LSTR.
+```
+@MWSP
+@MWADDR
+@MWLABEL
+```
+@MWSP states that the stack pointer should be multi-word, if necessary.
+@MWADDR states that memory addresses and memory pointers should be multi-word, if necessary.
+@MWLABEL states that labels should be multi-word, if necessary.
+
 # What it does
 You can think of this is a framework to help you easily compile URCL to your ISA without starting from the ground up.
 It does the vast majority of the work, and only leaves you to do CPU-specific parts.
