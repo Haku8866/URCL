@@ -1781,23 +1781,16 @@ def main():
   print(f"URCL code dumped in: {filename}")
   if ISA.__name__ in ("ISA_configs.Emulate","ISA_configs.Core"):
       return
-  print("A")
   program = fixPorts(program)
-  print("B")
   program = convertToISA(program)
-  print("C")
   try:program = ISA.LabelISA(program)
   except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's labelled ISA tweaks. Report this to them if necessary.")
-  print("D")
   if ISA.CPU_stats["REMOVE_LABELS"]:
     program = removeISALabels(program)
-  print("E")
   if ISA.CPU_stats["SHIFT_RAM"]:
     program = shiftRAM(program)
-  print("F")
   try:program = ISA.FinalISA(program)
   except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's final ISA tweaks. Report this to them if necessary.")
-  print("G")
   print(f"\n{ISA.__name__} code:")
   for x, line in enumerate(program):
     if line.label != []:
