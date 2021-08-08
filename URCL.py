@@ -1002,7 +1002,7 @@ def regSubstitution(program):
   global WORDS
   global FINALSUB
   done = False
-  exempt = ("IMM", "header", "pragma", "IN", "MULTI_IMM", "MULTI_MULTI_ADD", "MULTI_MULTI_SUB")
+  exempt = ("IMM", "header", "pragma", "IN", "MULTI_IMM", "MULTI_MULTI_ADD", "MULTI_MULTI_SUB", "DW")
   while not done:
     done = True
     tempregptr = 0
