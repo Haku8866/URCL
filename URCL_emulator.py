@@ -5,10 +5,13 @@ import time
 import traceback
 from random import randint
 
-operands = {"NEG": 2,"DW": 1,"DD": 1,"DQ": 1,"ADD": 3,"SUB": 3,"BSR": 3,"BSL": 3,"ADC": 3,"SBB": 3,"INC": 2,"DEC": 2,"MOV": 2,"IMM": 2,"XOR": 3,"AND": 3,"OR": 3,"NOR": 3,"NAND": 3,"XNOR": 3,"NOT": 2,"LOD": 2,"STR": 2,"JMP": 1,"BRC": 1,"BNC": 1,"BRZ": 1,"BNZ": 1,"BRN": 1,"BRP": 1,"BZR": 2,"BZN": 2,"NOP": 0,"HLT": 0,"MLT": 3,"DIV": 3,"MOD": 3,"SQRT": 2,"CAL": 1,"RET": 0,"PSH": 1,"POP": 1,"BRL": 3,"BRG": 3,"BRE": 3,"BNE": 3,"IN": 2,"OUT": 2,"BOD": 2,"BEV": 2,"RSH": 2,"LSH": 2,"CMP": 2,"SRS": 3,"BSS": 3,"BLE": 3,"BGE": 3,"BITS": 2,"MINREG": 1,"RUN": 1,"MINRAM": 1,"IMPORT": 0,"NAME": 1,"OPS": 1,"REG": 1,"IN": 1,"SETE": 3,"SETNE": 3,"SETG": 3,"SETL": 3,"SETGE": 3,"SETLE": 3,}
+operands = {"MINHEAP": 1,"NEG": 2,"DW": 1,"DD": 1,"DQ": 1,"ADD": 3,"SUB": 3,"BSR": 3,"BSL": 3,"ADC": 3,"SBB": 3,"INC": 2,"DEC": 2,"MOV": 2,"IMM": 2,"XOR": 3,"AND": 3,"OR": 3,"NOR": 3,"NAND": 3,"XNOR": 3,"NOT": 2,"LOD": 2,"STR": 2,"JMP": 1,"BRC": 1,"BNC": 1,"BRZ": 1,"BNZ": 1,"BRN": 1,"BRP": 1,"BZR": 2,"BZN": 2,"NOP": 0,"HLT": 0,"MLT": 3,"DIV": 3,"MOD": 3,"SQRT": 2,"CAL": 1,"RET": 0,"PSH": 1,"POP": 1,"BRL": 3,"BRG": 3,"BRE": 3,"BNE": 3,"IN": 2,"OUT": 2,"BOD": 2,"BEV": 2,"RSH": 2,"LSH": 2,"CMP": 2,"SRS": 3,"BSS": 3,"BLE": 3,"BGE": 3,"BITS": 2,"MINREG": 1,"RUN": 1,"MINRAM": 1,"IMPORT": 0,"NAME": 1,"OPS": 1,"REG": 1,"IN": 1,"SETE": 3,"SETNE": 3,"SETG": 3,"SETL": 3,"SETGE": 3,"SETLE": 3,}
 RUNRAM = True
 databuswidth = 8
 PC = 0
+CONSOLE = [["█"]]
+CONSOLE_X = 0
+CONSOLE_Y = 0
 
 class instruction:
   def __init__(self, label, opcode, operandList):
@@ -74,17 +77,47 @@ def convertToInstructions(program):
       end(f"Unknown instruction '{line[0]}'","- try checking:\n1. Is the file written in the lastest version of URCL?\n2. If so, has anyone raised this missing feature on the URCL discord yet? (https://discord.gg/jWRr2vx)",)
   return list(filter(None, code))
 
+def writeCharToConsole(char):
+  global CONSOLE
+  global CONSOLE_Y
+  global CONSOLE_X
+  if char == 10:
+    CONSOLE[CONSOLE_Y].pop()
+    CONSOLE.append(["█"])
+    if CONSOLE_Y < 10:
+      CONSOLE_Y += 1
+    else:
+      CONSOLE.pop(0)
+    CONSOLE_X = 0
+  elif char == 8:
+    CONSOLE[CONSOLE_Y].pop()
+    CONSOLE[CONSOLE_Y].pop()
+    CONSOLE[CONSOLE_Y].append("█")
+    CONSOLE_X -= 1
+  elif char == 13:
+    CONSOLE[CONSOLE_Y].pop()
+    CONSOLE_X = 0
+    CONSOLE[CONSOLE_Y][CONSOLE_X] = "█"
+  else:
+    CONSOLE[CONSOLE_Y][CONSOLE_X] = chr(char)
+    CONSOLE_X += 1
+    CONSOLE[CONSOLE_Y].append("█")
+  return
+
 def getState(program_input, databuswidth):
   global FLAG
   global REG
   global BITS
+  global CONSOLE
+  global CONSOLE_Y
+  global CONSOLE_X
   global PC
   PC = 0
   cycles = 0
   BITS = databuswidth
   RAM = []
   STACK = ["-" for x in range(10)]
-  REG = ["-" for x in range(BITS)]
+  REG = ["-" for x in range(BITS*3)]
   LABEL = {}
   OUTPUT = []
 
@@ -120,8 +153,10 @@ def getState(program_input, databuswidth):
         program[x].operandList[y] = str(int(operand[1:]) + offset)
   colorama.init()
   step = False
+  show = False
   try:
     if "-step" in s.argv: step = True
+    if "-show" in s.argv: show = True
   except:
     step = False
   while True:
@@ -182,7 +217,7 @@ def getState(program_input, databuswidth):
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + 1
       updateFlags(int(operands[0][1:]))
     elif opcode == "DEC":
-      REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + (~1 % 2**(BITS))+1
+      REG[int(operands[0][1:])] = (REG[int(operands[1][1:])] + (2**(BITS)-1)) & 2**(BITS)-1
       updateFlags(int(operands[0][1:]))
     elif opcode == "ADD":
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + REG[int(operands[2][1:])]
@@ -223,20 +258,49 @@ def getState(program_input, databuswidth):
       try:
         if operands[1] == "%RNG":
           REG[int(operands[0][1:])] = randint(0, (2**BITS)-1)
+        elif operands[1] == "%TEXT":
+          special = {
+            r"\n": 10,
+            r"\LF": 10,
+            r"\BS": 8,
+            r"\CR": 13,
+            r"\SP": 32,
+          }
+          char = input(f"IN (char): ")
+          if special.get(char):
+            char = special[char]
+          else:
+            char = ord(char)
+          #writeCharToConsole(char)
+          REG[int(operands[0][1:])] = char
+          printDisplay = True
+        elif operands[1] in ("%ASCII","%CHAR5","%CHAR6","%ASCII7","%UTF8"):
+          REG[int(operands[0][1:])] = ord(input(f"IN (char): "))
+        elif operands[1] == "%BIN":
+          REG[int(operands[0][1:])] = int(input(f"IN (bin ): "), 2)
+        elif operands[1] == "%HEX":
+          REG[int(operands[0][1:])] = int(input(f"IN (hex ): "), 16)
         else:
-          REG[int(operands[0][1:])] = int(input(f"IN (num between 0 and {2**BITS-1}): "))
+          REG[int(operands[0][1:])] = int(input(f"IN (num ): "))
       except:
         REG[int(operands[0][1:])] = 0
+      REG[int(operands[0][1:])] = REG[int(operands[0][1:])] & ((2**BITS)-1)
     elif opcode == "OUT":
       printDisplay = True
       if operands[0] == "%NUMB":
         OUTPUT.append(REG[int(operands[1][1:])])
       elif operands[0] == "%TEXT":
-        OUTPUT.append(chr(REG[int(operands[1][1:])]))
+        writeCharToConsole(REG[int(operands[1][1:])])
+      elif operands[0] == "%BIN":
+        OUTPUT.append(bin(REG[int(operands[1][1:])]))
+      elif operands[0] == "%HEX":
+        OUTPUT.append(hex(REG[int(operands[1][1:])]))
       elif operands[0] == "%X":
         PIX_DISPLAY_X = REG[int(operands[1][1:])]
       elif operands[0] == "%Y":
         PIX_DISPLAY_Y = REG[int(operands[1][1:])]
+      elif operands[0] in ("%TEXT","%ASCII","%CHAR5","%CHAR6","%ASCII7","%UTF8"):
+        OUTPUT.append(REG[chr(int(operands[1][1:]))])
       elif operands[0] == "%COLOR" or operands[0] == "%COLOUR":
         draw = "  "
         if REG[int(operands[1][1:])] != 0:
@@ -254,7 +318,7 @@ def getState(program_input, databuswidth):
       break
     elif opcode == "NOP":
       pass
-    if not printDisplay and not step:
+    if not printDisplay and not step and not show:
       continue
     printDisplay = False
     columns = [[],[],[],[],[]]
@@ -269,6 +333,7 @@ def getState(program_input, databuswidth):
         columns[0].append(f"├ {x:>{maxwidth}}: {val} ({lbl})" if lbl else f"├ {x:>{maxwidth}}: {val}")
       if mcnt > 17:
         columns[0].append(f"├ (approx. {len(RAM)-x} more values)")
+        mcnt += len(RAM)-x
         break
     if flg0:
       columns[0].append(f"├ {'...':>{maxwidth}}")
@@ -302,6 +367,10 @@ def getState(program_input, databuswidth):
     columns[2].append("")
     columns[2].append(f"- Executing")
     columns[2].append(f"├ {PC}: {opcode} {', '.join(operands)}")
+    columns[2].append(f"")
+    columns[2].append(f"- Console")
+    for line in CONSOLE:
+      columns[2].append(f"├ {''.join(line)}")
     columns[3].append(f"      - Runtime: {cycles} clock cycles")
     columns[3].append("")
     columns[3].append(f"Display X: {PIX_DISPLAY_X}")
