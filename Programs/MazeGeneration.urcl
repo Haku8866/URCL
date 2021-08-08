@@ -1,0 +1,299 @@
+MINHEAP 72
+MINREG 6
+BITS >= 8  // recommended 16 due to program length
+
+// Prim's algorithm
+// 8-bit
+// Maze size: 16x16 pixels, 64 nodes
+
+// %X set X pointer
+// %Y set Y pointer
+// %COLOR set pixel colour to 0 or 1
+// %NUMB = progress bar, done when it hits 0
+
+// $1: X pointer
+// $2: Y pointer
+
+// struct Node {
+//    b0: top node in maze
+//    b1: right node in maze
+//    b2: bottom node in maze
+//    b3: left node in maze
+//    b4: ---
+//    b5: ---
+//    b6: node in maze
+//    b7: ---
+// }
+
+// Maze layout:
+// [7, 0] . . . [7, 7]
+// .    .           .
+// .        .       .
+// .            .   .
+// [0, 0] . . . [0, 7]
+
+// __________________ Create a lookup table for MLT A, A, 7 for A = 0 to 6
+STR #64, 0
+STR #65, 8
+STR #66, 16
+STR #67, 24
+STR #68, 32
+STR #69, 40
+STR #70, 48
+STR #71, 56
+// FOR:
+//    B = A * 8
+// USE:
+//    LLOD B, #64, A
+
+// __________________ Create a counter to count maze nodes
+STR #72, 64
+OUT %NUMB, 64
+// __________________ Create an empty maze
+
+// for y in maze {
+IMM $2, 0
+.yloop
+    // for x in maze {
+    IMM $1, 0
+    .xloop
+    // ------- Detect maze boundaries
+    // $3 = current node
+        IMM $3, 0
+        BNE .notBottom, $2, 7
+        // if at bottom of maze:
+        OR $3, $3, 0b00000100
+        JMP .notTop
+        .notBottom
+        BNZ .notTop, $2
+        // if at top of maze:
+        OR $3, $3, 0b00000001
+        .notTop
+        BNZ .notLeft, $1
+        // if at left of maze:
+        OR $3, $3, 0b00001000
+        JMP .notRight
+        .notLeft
+        BNE .notRight, $1, 7
+        // if at right of maze:
+        OR $3, $3, 0b00000010
+        .notRight
+    // ------- Display node
+        LSH $1, $1
+        LSH $2, $2
+        // Top left corner is blank
+        OUT %X, $1
+        OUT %Y, $2
+        OUT %COLOR, 0
+        // Top right corner is wall
+        INC $1, $1
+        OUT %X, $1
+        OUT %COLOR, 1
+        // Bottom right corner is wall
+        INC $2, $2
+        OUT %Y, $2
+        OUT %COLOR, 1
+        // Bottom left corner is wall
+        DEC $1, $1
+        OUT %X, $1
+        OUT %COLOR, 1
+        DEC $2, $2
+        RSH $2, $2
+        RSH $1, $1
+    // ------- Store node
+        LLOD $4, #64, $2
+        ADD $4, $4, $1
+        ADD $4, $4, #0
+        STR $4, $3
+    INC $1, $1
+    BLE .xloop, $1, 7
+    // } end of x loop
+INC $2, $2
+BLE .yloop, $2, 7
+// } end of y loop
+
+// __________________ Carve the maze - DONE
+
+// Reset after loop
+IMM $1, 4
+IMM $2, 4
+// Add the bottom left node to the maze
+CAL .addNodeToMaze
+LOD $3, #72
+DEC $3, $3
+OUT %NUMB, $3
+STR #72, $3
+.mainLoop
+    // Pick a random node in the maze
+    IN $1, %RNG
+    AND $1, $1, 0b00000111
+    IN $2, %RNG
+    AND $2, $2, 0b00000111
+    LLOD $3, #64, $2
+    ADD $3, $3, $1
+    ADD $3, $3, #0
+    LOD $3, $3
+    // if not in maze...
+    AND $4, $3, 0b01000000
+    // ... pick another
+    BRZ .mainLoop, $4
+    // if node in maze:
+        // Pick a random direction
+        IMM $6, 4
+        .subLoop
+        IN $4, %RNG
+        AND $4, $4, 0b00000011
+        // Make sure we don't get stuck in a loop
+        // 0 == try carve up
+        BNZ .skip, $4
+            INC $4, $4
+            AND $4, $4, 0b00000011
+            DEC $6, $6
+            AND $5, $3, 0b00000001
+            BRZ .success, $5
+            BNZ .subLoop, $6
+            BRZ .mainLoop, $6
+            .success
+            // Passage can be carved up
+            DEC $2, $2
+            // Add node above to maze
+            CAL .addNodeToMaze
+            INC $2, $2
+            // Update display
+            LSH $1, $1
+            LSH $2, $2
+            DEC $2, $2
+            OUT %X, $1
+            OUT %Y, $2
+            OUT %COLOR, 0
+            JMP .nodeAdded
+        .skip
+        // 1 == try carve down
+        BNE .skip2, $4, 1
+            INC $4, $4
+            AND $4, $4, 0b00000011
+            DEC $6, $6
+            AND $5, $3, 0b00000100
+            BRZ .success2, $5
+            BNZ .subLoop, $6
+            BRZ .mainLoop, $6
+            JMP .skip2
+            .success2
+            // Passage can be carved down
+            // Add node below to maze
+            INC $2, $2
+            CAL .addNodeToMaze
+            DEC $2, $2
+            // Update display
+            LSH $1, $1
+            LSH $2, $2
+            INC $2, $2
+            OUT %X, $1
+            OUT %Y, $2
+            OUT %COLOR, 0
+            JMP .nodeAdded
+        .skip2
+        // 2 == try carve left
+        BNE .skip3, $4, 2
+            INC $4, $4
+            AND $4, $4, 0b00000011
+            DEC $6, $6
+            AND $5, $3, 0b00001000
+            BRZ .success3, $5
+            BNZ .subLoop, $6
+            BRZ .mainLoop, $6
+            JMP .skip3
+            .success3
+            // Passage can be carved left
+            DEC $1, $1
+            // Add node to the left to maze
+            CAL .addNodeToMaze
+            INC $1, $1
+            // Update display
+            LSH $1, $1
+            LSH $2, $2
+            DEC $1, $1
+            OUT %X, $1
+            OUT %Y, $2
+            OUT %COLOR, 0
+            JMP .nodeAdded
+        .skip3
+        // 3 == try carve right
+        INC $4, $4
+        AND $4, $4, 0b00000011
+        DEC $6, $6
+        AND $5, $3, 0b00000010
+        BRZ .success4, $5
+        BNZ .subLoop, $6
+        BRZ .mainLoop, $6
+        .success4
+        // Passage can be carved right
+        // Add node to the right to maze
+        INC $1, $1
+        CAL .addNodeToMaze
+        DEC $1, $1
+        // Update display
+        LSH $1, $1
+        LSH $2, $2
+        INC $1, $1
+        OUT %X, $1
+        OUT %Y, $2
+        OUT %COLOR, 0
+        JMP .nodeAdded
+    .nodeAdded
+    // Check if all 64 nodes are added
+    LOD $3, #72
+    DEC $3, $3
+    STR #72, $3
+    OUT %NUMB, $3
+    // if so, stop ...
+    BRZ .mazeComplete, $3
+    // ... if not, keep going
+    JMP .mainLoop
+.mazeComplete
+HLT
+
+.addNodeToMaze
+// Input: $1: X, $2: Y
+// Get node
+    LLOD $3, #64, $2
+    ADD $3, $3, #0
+    ADD $3, $3, $1
+    LOD $4, $3
+// Add to maze
+    OR $4, $4, 0b01000000
+    STR $3, $4
+// Update neighbours
+    BRE .Bottom, $2, 7
+    // if not at bottom of maze:
+    ADD $3, $3, 8
+    LOD $4, $3
+    OR $4, $4, 0b00000001
+    STR $3, $4
+    SUB $3, $3, 8
+    .Bottom
+    BRZ .Top, $2
+    // if not at top of maze:
+    SUB $3, $3, 8
+    LOD $4, $3
+    OR $4, $4, 0b00000100
+    STR $3, $4
+    ADD $3, $3, 8
+    .Top
+    BRZ .Left, $1
+    // if not at left of maze:
+    DEC $3, $3
+    LOD $4, $3
+    OR $4, $4, 0b00000010
+    STR $3, $4
+    INC $3, $3
+    .Left
+    BRE .Right, $1, 7
+    // if not at right of maze:
+    INC $3, $3
+    LOD $4, $3
+    OR $4, $4, 0b00001000
+    STR $3, $4
+    DEC $3, $3
+    .Right
+RET

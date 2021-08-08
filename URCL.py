@@ -41,6 +41,7 @@ opcodes = {
   "IMPORT": ("header", "core"),
   "BITS": ("header", "core"),
   "MINRAM": ("header", "core"),
+  "MINHEAP": ("header", "core"),
   "MINREG": ("header", "core"),
   "MINSTACK": ("header", "core"),
   "RUN": ("header", "core"),
@@ -1769,7 +1770,7 @@ def main():
     if x > (max_y//2) - 9:
       print(f"... ({len(program)-1-x} more lines)")
       break
-  filename = "URCL_output.urcl"
+  filename = "URCL_output/URCL_output.urcl"
   if len(s.argv) > 4:
       filename = s.argv[4]
   outfile = open(filename, "w+")
@@ -1799,7 +1800,7 @@ def main():
     if x > (max_y//2) - 9:
         print(f"... ({len(program)-1-x} more lines)")
         break
-  filename = f"{ISA.__name__}_output.txt"
+  filename = f"ISA_output/{ISA.__name__}_output.txt"
   if len(s.argv) > 3:
       filename = s.argv[3]
   outfile = open(filename, "w+")

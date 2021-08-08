@@ -1,0 +1,56 @@
+BITS >= 4
+MINHEAP 32
+MINREG 3
+
+// Create an array: [15, 14, 13, ..., 1, 0]
+IMM $1, #0
+IMM $2, 15
+.fill_array
+  STR $1, $2
+  BRZ .break, $2
+  INC $1, $1
+  DEC $2, $2
+JMP .fill_array
+.break
+
+// Create a count array: [15, 14, 13, ..., 1, 0]
+IMM $1, #16
+IMM $2, 15
+.fill_array2
+  STR $1, 0
+  BRZ .break2, $2
+  INC $1, $1
+  DEC $2, $2
+JMP .fill_array2
+.break2
+
+// Count the number of occurences of each number, appending each result to the count array:
+IMM $1, #0
+.loop0
+  IMM $2, #16
+  LOD $3, $1
+  ADD $3, $3, $2
+  LOD $2, $3
+  INC $2, $2
+  STR $3, $2
+  INC $1, $1
+BNE .loop0, $1, #16
+
+IMM $2, #0
+// For each value:
+.loop1
+  LOD $3, $1
+  SUB $1, $1, #16
+  // Append the value <frequency> times to the original list, reading from the count array:
+  .loop2
+    BRZ .break3, $3
+    STR $2, $1
+    INC $2, $2
+    DEC $3, $3
+  JMP .loop2
+  .break3
+  BRE .end, $2, #16
+  ADD $1, $1, #17
+JMP .loop1
+.end
+HLT

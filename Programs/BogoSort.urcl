@@ -1,0 +1,40 @@
+BITS >= 4
+MINHEAP 4
+MINREG 4
+
+// Create an array: [3, 2, 1, 0]
+IMM $1, #0
+IMM $2, 3
+.fill_array
+  STR $1, $2
+  BRZ .loop0, $2
+  INC $1, $1
+  DEC $2, $2
+JMP .fill_array
+
+// While not done:
+.loop0
+  // Select a random element in the array
+  IN $1, %RNG
+  AND $1, $1, 0b11
+  ADD $1, $1, #0
+  LOD $2, $1
+  // Select a second element in the array
+  IN $3, %RNG
+  AND $3, $3, 0b11
+  ADD $3, $3, #0
+  LOD $4, $3
+  // Swap the two elements
+  STR $1, $4
+  STR $3, $2
+  // If the array is sorted, halt
+  IMM $1, #0
+  .loop1
+    LOD $2, $1
+    INC $1, $1
+    LOD $3, $1
+    BRL .loop0, $3, $2
+    BRE .end, $1, #3
+  JMP .loop1
+.end
+HLT

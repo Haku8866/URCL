@@ -1,0 +1,313 @@
+// MAZE GENERATION
+
+MINHEAP 140
+MINREG 5
+BITS >= 8
+
+// Prim's algorithm with a depth-first bias
+// Maze size: 16x16 pixels 64 nodes
+
+// @MWLABEL
+
+// __________________ Create a lookup table for MLT A A 7 for A = 0 to 6
+STR #64 0
+STR #65 8
+STR #66 16
+STR #67 24
+STR #68 32
+STR #69 40
+STR #70 48
+STR #71 56
+// FOR:
+//    B = A * 8
+// USE:
+//    LLOD B #64 A
+
+// __________________ Create a second stack pointer for the edge stack
+STR #77 #77
+// Edge stack: contains addresses of next nodes to be added to maze
+
+// __________________ Create an empty maze
+// for y in maze {
+IMM $2 0
+.yloop
+    // for x in maze {
+    IMM $1 0
+    .xloop
+    // ------- Detect maze boundaries
+    // $3 = current node
+        IMM $3 0
+        BNE .notBottom $2 7
+        // if at bottom of maze:
+        OR $3 $3 0b00000100
+        JMP .notTop
+        .notBottom
+        BNZ .notTop $2
+        // if at top of maze:
+        OR $3 $3 0b00000001
+        .notTop
+        BNZ .notLeft $1
+        // if at left of maze:
+        OR $3 $3 0b00001000
+        JMP .notRight
+        .notLeft
+        BNE .notRight $1 7
+        // if at right of maze:
+        OR $3 $3 0b00000010
+        .notRight
+    // ------- Display node
+        LSH $1 $1
+        LSH $2 $2
+        // Top left corner is blank
+        OUT %X $1
+        OUT %Y $2
+        OUT %COLOR 0
+        // Top right corner is wall
+        INC $1 $1
+        OUT %X $1
+        OUT %COLOR 1
+        // Bottom right corner is wall
+        INC $2 $2
+        OUT %Y $2
+        OUT %COLOR 1
+        // Bottom left corner is wall
+        DEC $1 $1
+        OUT %X $1
+        OUT %COLOR 1
+        DEC $2 $2
+        RSH $2 $2
+        RSH $1 $1
+    // ------- Store node
+        LLOD $4 #64 $2
+        ADD $4 $4 $1
+        ADD $4 $4 #0
+        STR $4 $3
+    INC $1 $1
+    BLE .xloop $1 7
+    // } end of x loop
+INC $2 $2
+BLE .yloop $2 7
+// } end of y loop
+
+// __________________ Carve the maze - DONE
+
+// Reset after loop
+IMM $1 0
+IMM $2 0
+// Add the bottom left node to the maze
+CAL .addNodeToMaze
+.mainLoop
+    // Pop the next node of the edge stack
+    LOD $3 #77
+    DEC $4 $3
+    LOD $3 $3
+    STR #77 $4
+    // Extract the X and Y coords $1 and $2 respectively
+    SUB $3 $3 #0
+    RSH $2 $3
+    RSH $2 $2
+    RSH $2 $2
+    AND $1 $3 0b00000111
+    ADD $3 $3 #0
+    LOD $3 $3
+    // If the node is already in the maze, skip it
+    AND $5 $3 0b01000000
+    BNZ .alreadyInMaze $5
+    // Pick a random direction
+    PSH $1
+    PSH $2
+    .subLoop
+    IN $4 %RNG
+    AND $4 $4 0b00000011
+    // 0 == try carve up
+    BNZ .next0 $4
+        AND $5 $3 0b00000001
+        BRZ .subLoop $5
+        BRZ .subLoop $2
+        // Passage can be carved up
+        // Update display
+        LSH $1 $1
+        LSH $2 $2
+        DEC $2 $2
+        OUT %X $1
+        OUT %Y $2
+        OUT %COLOR 0
+        JMP .nodeAdded
+    .next0
+    // 1 == try carve down
+    BNE .next1 $4 1
+        AND $5 $3 0b00000100
+        BRZ .subLoop $5
+        BRE .subLoop $2 7
+        // Passage can be carved down
+        // Add node below to maze
+        // Update display
+        LSH $1 $1
+        LSH $2 $2
+        INC $2 $2
+        OUT %X $1
+        OUT %Y $2
+        OUT %COLOR 0
+        JMP .nodeAdded
+    .next1
+    // 2 == try carve left
+    BNE .next2 $4 2
+        AND $5 $3 0b00001000
+        BRZ .subLoop $5
+        BRZ .subLoop $1
+        // Passage can be carved left
+        // Update display
+        LSH $1 $1
+        LSH $2 $2
+        DEC $1 $1
+        OUT %X $1
+        OUT %Y $2
+        OUT %COLOR 0
+        JMP .nodeAdded
+    .next2
+    // 3 == try carve right
+    AND $5 $3 0b00000010
+    BRZ .subLoop $5
+    BRE .subLoop $1 7
+    // Passage can be carved right
+    // Add node to the right to maze
+    // Update display
+    LSH $1 $1
+    LSH $2 $2
+    INC $1 $1
+    OUT %X $1
+    OUT %Y $2
+    OUT %COLOR 0
+    .nodeAdded
+    POP $2
+    POP $1
+    CAL .addNodeToMaze
+    .alreadyInMaze
+    LOD $3 #77
+    // if so stop ...
+    BRE .mazeComplete $3 #77
+    // ... if not keep going
+    JMP .mainLoop
+.mazeComplete
+HLT
+
+.addNodeToMaze
+    // Input: $1: X $2: Y
+    // Get node
+        LLOD $3 #64 $2
+        ADD $3 $3 #0
+        ADD $3 $3 $1
+        LOD $4 $3
+    // Add to maze
+        OR $4 $4 0b01000000
+        STR $3 $4
+    // Update neighbours
+        PSH $4
+        BRE .Bottom $2 7
+        // if not at bottom of maze:
+        ADD $3 $3 8
+        LOD $4 $3
+        OR $4 $4 0b00000001
+        STR $3 $4
+        AND $5 $4 0b01000000
+        BRZ .pass0 $5
+        SUB $3 $3 8
+        JMP .Bottom
+        .pass0
+        STR #73 $3
+        SUB $3 $3 8
+        JMP .skipBottom
+        .Bottom
+        STR #73 #73
+        .skipBottom
+        POP $4
+        PSH $4
+        BRZ .Top $2
+        // if not at top of maze:
+        SUB $3 $3 8
+        LOD $4 $3
+        OR $4 $4 0b00000100
+        STR $3 $4
+        AND $5 $4 0b01000000
+        BRZ .pass1 $5
+        ADD $3 $3 8
+        JMP .Top
+        .pass1
+        STR #74 $3
+        ADD $3 $3 8
+        JMP .skipTop
+        .Top
+        STR #74 #73
+        .skipTop
+        POP $4
+        PSH $4
+        BRZ .Left $1
+        // if not at left of maze:
+        DEC $3 $3
+        LOD $4 $3
+        OR $4 $4 0b00000010
+        STR $3 $4
+        AND $5 $4 0b01000000
+        BRZ .pass2 $5
+        INC $3 $3
+        JMP .Left
+        .pass2
+        STR #75 $3
+        INC $3 $3
+        JMP .skipLeft
+        .Left
+        STR #75 #73
+        .skipLeft
+        POP $4
+        BRE .Right $1 7
+        // if not at right of maze:
+        INC $3 $3
+        LOD $4 $3
+        OR $4 $4 0b00001000
+        STR $3 $4
+        AND $5 $4 0b01000000
+        BRZ .pass3 $5
+        DEC $3 $3
+        JMP .Right
+        .pass3
+        STR #76 $3
+        DEC $3 $3
+        JMP .skipRight
+        .Right
+        STR #76 #73
+        .skipRight
+    // Shuffle new nodes
+        PSH $1
+        PSH $2
+        IMM $5 4
+        // Swap two random items in the array from #73 to #76
+        .swapLoop
+        IN $1 %RNG
+        AND $1 $1 0b00000011
+        LLOD $3 #73 $1
+        IN $2 %RNG
+        AND $2 $2 0b00000011
+        LLOD $4 #73 $2
+        LSTR $4 #73 $1
+        LSTR $3 #73 $2
+        BRZ .swapLoopEnd $5
+        DEC $5 $5
+        JMP .swapLoop
+        .swapLoopEnd
+    // Push new nodes to edge stack
+        LOD $3 #77
+        IMM $1 #73
+        IMM $2 4
+        .pushLoop
+        LOD $4 $1
+        INC $1 $1
+        BRE .skipPush $4 #73
+        INC $3 $3
+        STR $3 $4
+        .skipPush
+        DEC $2 $2
+        BNZ .pushLoop $2
+        STR #77 $3
+        POP $2
+        POP $1
+RET

@@ -1,0 +1,47 @@
+BITS >= 4
+MINHEAP 19
+MINREG 3
+
+// Create an array: [15, 14, 13, ..., 1, 0]
+IMM $1, #2
+IMM $2, 15
+.fill_array
+  STR $1, $2
+  BRZ .break, $2
+  INC $1, $1
+  DEC $2, $2
+JMP .fill_array
+.break
+
+IMM $2, 15
+STR #0, $2
+// For item in array:
+.loop0
+  IMM $1, #2
+  LOD $2, #0
+  BRZ .skip2, $2
+  STR #1, $2
+  // For item in array:
+  .loop1
+    // If item > next_item, swap them
+    LOD $2, $1
+    INC $1, $1
+    LOD $3, $1
+    DEC $1, $1
+    BLE .skip, $2, $3
+    STR $1, $3
+    INC $1, $1
+    STR $1, $2
+    DEC $1, $1
+    .skip
+    INC $1, $1
+    LOD $2, #1
+    DEC $2, $2
+    STR #1, $2
+  BNZ .loop1, $2
+  .skip2
+  LOD $2, #0
+  DEC $2, $2
+  STR #0, $2
+BRL .loop0, $2, -1
+HLT

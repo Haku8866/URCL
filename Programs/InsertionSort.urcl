@@ -1,0 +1,37 @@
+// sammyuri's insertion sort
+
+BITS >= 4
+MINRAM 16
+MINREG 4
+
+// Create an array: [15, 14, 13, ..., 1, 0]
+IMM $1, #0
+IMM $2, 15
+.fill_array
+  STR $1, $2
+  BRZ .break, $2
+  INC $1, $1
+  DEC $2, $2
+JMP .fill_array
+.break
+
+IMM $1, #0 // pointer
+.mainloop
+  LOD $2, $1 // value to insert
+  MOV $3, $1 // pointer for second value
+  .subloop
+    BRE .continue, $3, #0 // finished
+    DEC $3, $3
+    LOD $4, $3 // value to compare
+    BLE .addone, $4, $2
+    INC $3, $3 // store
+    STR $3, $4
+    DEC $3, $3
+    JMP .subloop
+  .addone
+  INC $3, $3
+  .continue
+  STR $3, $2 // place value in correct position
+  INC $1, $1
+  BNE .mainloop, $1, #16
+HLT

@@ -3,6 +3,7 @@ import os
 import colorama
 import time
 import traceback
+import json
 from random import randint
 
 operands = {"MINHEAP": 1,"NEG": 2,"DW": 1,"DD": 1,"DQ": 1,"ADD": 3,"SUB": 3,"BSR": 3,"BSL": 3,"ADC": 3,"SBB": 3,"INC": 2,"DEC": 2,"MOV": 2,"IMM": 2,"XOR": 3,"AND": 3,"OR": 3,"NOR": 3,"NAND": 3,"XNOR": 3,"NOT": 2,"LOD": 2,"STR": 2,"JMP": 1,"BRC": 1,"BNC": 1,"BRZ": 1,"BNZ": 1,"BRN": 1,"BRP": 1,"BZR": 2,"BZN": 2,"NOP": 0,"HLT": 0,"MLT": 3,"DIV": 3,"MOD": 3,"SQRT": 2,"CAL": 1,"RET": 0,"PSH": 1,"POP": 1,"BRL": 3,"BRG": 3,"BRE": 3,"BNE": 3,"IN": 2,"OUT": 2,"BOD": 2,"BEV": 2,"RSH": 2,"LSH": 2,"CMP": 2,"SRS": 3,"BSS": 3,"BLE": 3,"BGE": 3,"BITS": 2,"MINREG": 1,"RUN": 1,"MINRAM": 1,"IMPORT": 0,"NAME": 1,"OPS": 1,"REG": 1,"IN": 1,"SETE": 3,"SETNE": 3,"SETG": 3,"SETL": 3,"SETGE": 3,"SETLE": 3,}
@@ -12,6 +13,10 @@ PC = 0
 CONSOLE = [["█"]]
 CONSOLE_X = 0
 CONSOLE_Y = 0
+
+PAGE = 0
+ADDRESS = 0
+FILE = {}
 
 class instruction:
   def __init__(self, label, opcode, operandList):
@@ -112,12 +117,15 @@ def getState(program_input, databuswidth):
   global CONSOLE_Y
   global CONSOLE_X
   global PC
+  global PAGE
+  global ADDRESS
+  global FILE
   PC = 0
   cycles = 0
   BITS = databuswidth
   RAM = []
   STACK = ["-" for x in range(10)]
-  REG = ["-" for x in range(BITS*3)]
+  REG = ["-" for x in range(30)]
   LABEL = {}
   OUTPUT = []
 
@@ -258,6 +266,16 @@ def getState(program_input, databuswidth):
       try:
         if operands[1] == "%RNG":
           REG[int(operands[0][1:])] = randint(0, (2**BITS)-1)
+        elif operands[1] == "%BUS":
+          if not FILE:
+            if not os.path.isfile(f"Emulator/Storage/{BITS}_bit_storage.json"):
+              with open(f"Emulator/Storage/{BITS}_bit_storage.json", "x") as f:
+                json.dump({0:{}}, f)
+                f.close()
+            with open(f"Emulator/Storage/{BITS}_bit_storage.json") as f:
+              FILE = json.load(f)
+              f.close()
+          REG[int(operands[0][1:])] = FILE[str(PAGE)][str(ADDRESS)]
         elif operands[1] == "%TEXT":
           special = {
             r"\n": 10,
@@ -289,6 +307,23 @@ def getState(program_input, databuswidth):
       printDisplay = True
       if operands[0] == "%NUMB":
         OUTPUT.append(REG[int(operands[1][1:])])
+      elif operands[0] == "%ADDR":
+        ADDRESS = REG[int(operands[1][1:])]
+      elif operands[0] == "%PAGE":
+        PAGE = REG[int(operands[1][1:])]
+      elif operands[0] == "%BUS":
+        if not FILE:
+          if not os.path.isfile(f"Emulator/Storage/{BITS}_bit_storage.json"):
+            with open(f"Emulator/Storage/{BITS}_bit_storage.json", "x") as f:
+              json.dump({0:{}}, f)
+              f.close()
+          with open(f"Emulator/Storage/{BITS}_bit_storage.json") as f:
+            FILE = json.load(f)
+            f.close()
+        FILE[str(PAGE)][str(ADDRESS)] = REG[int(operands[1][1:])]
+        with open(f"Emulator/Storage/{BITS}_bit_storage.json", "w") as f:
+          json.dump(FILE, f)
+          f.close()
       elif operands[0] == "%TEXT":
         writeCharToConsole(REG[int(operands[1][1:])])
       elif operands[0] == "%BIN":
@@ -418,12 +453,13 @@ def main():
     print('\x1b[2J')
     state = getState(program, databuswidth)
   except Exception as ex:
-    #if ex.__class__ is TypeError:
-    #  print(f"Null reference exception! You're either:\n - 1) Using a register that hasn't been loaded with an IMM <reg> <val> instruction.\n - 2) Loading a value from memory that hasn't been set with a STR <addr> <val/reg> instruction.\nVariables need to be set before being used, as the CPU won't set everything to 0 before running your program.")
-    #elif ex.__class__ is IndexError:
-    #  print(f"Index out of bounds error! You're either:\n - 1) Using too many registers (this CPU only has {databuswidth}), try using some memory instead.\n - 2) Using too much memory (this CPU only has {2**BITS} words), try making your program more efficient, or target {databuswidth*2} bit CPUs instead.")
-    #else:
-      print(f"URCL code line: {PC}")
-      print(traceback.format_exc())
+    print("------------ The emulator has crashed! :( ------------")
+    print(f"URCL instruction number: {PC} (this does not count labels)")
+    print(traceback.format_exc())
+    print("------------ Potential causes (in order of probability) ------------")
+    if ex.__class__ is TypeError:
+      print(f"├ 1. You're LOD-ing from a memory address that hasn't been written to yet.")
+    elif ex.__class__ is IndexError:
+      print(f"Index out of bounds error! You're either:\n - 1) Using too many registers (this CPU only has {databuswidth}), try using some memory instead.\n - 2) Using too much memory (this CPU only has {2**BITS} words), try making your program more efficient, or target {databuswidth*2} bit CPUs instead.")
 if __name__ == "__main__":
   main()
