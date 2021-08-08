@@ -257,8 +257,9 @@ cmplx_subs = {
     "INC SP, SP"
   ],
   "CAL": [
-    "PSH +2",
+    "PSH .return_addr",
     "JMP <A>",
+    ".return_addr",
     "NOP"
   ],
   "RET": [
@@ -516,10 +517,26 @@ def convertOperands(program):
         ins.operandList[y] = operand("stackPtr", "", word)
       elif opr[0] == "&":
         ins.operandList[y] = operand("bitPattern", opr[1:], word)
+      elif opr[0] == "%":
+        ins.operandList[y] = operand("port", opr[1:], word)
       elif opr[0] == "<" and ins.opcode.type != "header":
         ins.operandList[y] = operand("placeholder", opr[1], word)
       elif opr[0] == "^":
         ins.operandList[y] = operand("tempreg", int(opr[1:]), word)
+      elif opr[0] in ('"',"'"):
+        o = opr[1:][:-1]
+        if o == r"\n":
+          ins.operandList[y] = operand("number", 10, word)
+        elif o == r"\BS":
+          ins.operandList[y] = operand("number", 8, word)
+        elif o == r"\SP":
+          ins.operandList[y] = operand("number", 32, word)
+        elif o == r"\LF":
+          ins.operandList[y] = operand("number", 10, word)
+        elif o == r"\CR":
+          ins.operandList[y] = operand("number", 13, word)
+        else:
+          ins.operandList[y] = operand("number", ord(o), word)
       else:
         try:
           ins.operandList[y] = operand("number", int(opr, 0), word)
@@ -551,7 +568,7 @@ def readHeaders(program):
           if opr.value > MAXREG:
             MAXREG = opr.value
       if ins.opcode.type in ("header", "pragma"):
-        if ins.opcode.name == "MINRAM":
+        if ins.opcode.name in ("MINRAM", "MINHEAP"):
           MINRAM = ins.operandList[0].value
         elif ins.opcode.name == "MINSTACK":
           MINSTACK = ins.operandList[0].value
@@ -580,6 +597,20 @@ def evaluateBitPattern(bitPattern):
   # Allows bit patterns in the form &(1)(0)+c where c is a constant
   opr = bitPattern.value
   c = 0
+  if opr == "MAX":
+    opr = "(1)"
+  elif opr == "MSB":
+    opr = "1(0)"
+  elif opr == "SMSB":
+    opr = "01(0)"
+  elif opr == "SMAX":
+    opr = "0(1)"
+  elif opr == "UHALF":
+    opr = "(1)(0)"
+  elif opr == "LHALF":
+    opr = "(0)(1)"
+  elif opr == "BITS":
+    opr = BITS
   if "+" in opr:
     opr, c = opr.split("+")
     c = int(c)
@@ -661,10 +692,26 @@ def parseIns(ins):
       ins.operandList[y] = operand("stackPtr", "", word)
     elif opr[0] == "&":
       ins.operandList[y] = operand("bitPattern", opr[1:], word)
+    elif opr[0] == "%":
+      ins.operandList[y] = operand("port", opr[1:], word)
     elif opr[0] == "<" and ins.opcode.type != "header":
       ins.operandList[y] = operand("placeholder", opr[1], word)
     elif opr[0] == "^":
       ins.operandList[y] = operand("tempreg", int(opr[1:]), word)
+    elif opr[0] in ('"',"'"):
+      o = opr[1:][:-1]
+      if o == r"\n":
+        ins.operandList[y] = operand("number", 10, word)
+      elif o == r"\BS":
+        ins.operandList[y] = operand("number", 8, word)
+      elif o == r"\SP":
+        ins.operandList[y] = operand("number", 32, word)
+      elif o == r"\LF":
+        ins.operandList[y] = operand("number", 10, word)
+      elif o == r"\CR":
+        ins.operandList[y] = operand("number", 13, word)
+      else:
+        ins.operandList[y] = operand("number", ord(opr[1]), word)
     else:
       try:
         ins.operandList[y] = operand("number", int(opr, 0), word)
@@ -1255,10 +1302,12 @@ def setupStack(program):
   newSP = int(ISA.CPU_stats["SP_LOCATION"])
   if newSP == 0:
     newSP = MAXREG + 1
+  val = int(ISA.CPU_stats["SP_VALUE"])
   if MWSP:
-    val = int(ISA.CPU_stats["SP_VALUE"])
     for w in range(WORDS):
-      program[0:0] = [instruction([], opcode("IMM", "register", "core"), [operand("stackPtr", "", w), operand("number", (val>>BITS*w)&(2**BITS-1))])]
+      program = [instruction([], opcode("IMM", "register", "core"), [operand("stackPtr", "", w), operand("number", (val>>BITS*w)&(2**BITS-1))])] + program
+  else:
+    program = [instruction([], opcode("IMM", "register", "core"), [operand("stackPtr", ""), operand("number", val)])] + program
   return program
 
 def fixStack(program):
@@ -1348,7 +1397,7 @@ def removeISALabels(program):
     program[x].label = []
   for x, ins in enumerate(program):
     for lbl in labels:
-      while lbl[:-1] in ins.instruction:
+      while lbl[:-1]+"^" in ins.instruction:
         word = int(ins.instruction.split(lbl[:-1])[1].split("^")[1].split("%")[0])
         full_lbl = f"{lbl[:-1]}^{word}%"
         val = (labels[lbl] >> BITS*word) & (2**BITS-1)
@@ -1447,7 +1496,7 @@ def convertMultiWordInstructions(program):
     if MWLABEL:
       if f"{WORDS}_" in ins.opcode.name:
         pass
-      elif ins.opcode.name in ("RET", "PSH", "POP"):
+      elif ins.opcode.name in ("RET"):
         ins.opcode.name = f"{WORDS}_" + ins.opcode.name
       elif ins.opcode.type == "branch":
         ins.operandList = [operand(ins.operandList[0].type, ins.operandList[0].value, WORDS-y-1) for y in range(WORDS)] + ins.operandList[1:]
@@ -1461,6 +1510,8 @@ def convertMultiWordInstructions(program):
         ins.opcode.name = f"{WORDS}_" + ins.opcode.name
       elif ins.opcode.name in ("LOD", "OUT"):
         ins.operandList = [ins.operandList[0]] + [operand(ins.operandList[1].type, ins.operandList[1].value, WORDS-y-1) for y in range(WORDS)]
+        ins.opcode.name = f"{WORDS}_" + ins.opcode.name
+      elif ins.opcode.name in ("PSH", "POP"):
         ins.opcode.name = f"{WORDS}_" + ins.opcode.name
   return program
 
@@ -1730,16 +1781,23 @@ def main():
   print(f"URCL code dumped in: {filename}")
   if ISA.__name__ in ("ISA_configs.Emulate","ISA_configs.Core"):
       return
+  print("A")
   program = fixPorts(program)
+  print("B")
   program = convertToISA(program)
+  print("C")
   try:program = ISA.LabelISA(program)
   except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's labelled ISA tweaks. Report this to them if necessary.")
+  print("D")
   if ISA.CPU_stats["REMOVE_LABELS"]:
     program = removeISALabels(program)
+  print("E")
   if ISA.CPU_stats["SHIFT_RAM"]:
     program = shiftRAM(program)
+  print("F")
   try:program = ISA.FinalISA(program)
   except Exception as ex:end(ex,"- no suggestions, problem with ISA designer's final ISA tweaks. Report this to them if necessary.")
+  print("G")
   print(f"\n{ISA.__name__} code:")
   for x, line in enumerate(program):
     if line.label != []:
