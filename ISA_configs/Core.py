@@ -1,7 +1,7 @@
 CPU_stats = {
   "REGISTERS":"99999",
   "MEMORY": "99999",
-  "DATABUS_WIDTH": "1",
+  "DATABUS_WIDTH": "8",
   "RUN_RAM": False,
   "REMOVE_LABELS": False,
   "SHIFT_RAM": False,
