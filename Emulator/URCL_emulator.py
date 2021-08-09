@@ -125,7 +125,7 @@ def getState(program_input, databuswidth):
   BITS = databuswidth
   RAM = []
   STACK = ["-" for x in range(10)]
-  REG = ["-" for x in range(30)]
+  REG = ["-" for x in range(32)]
   LABEL = {}
   OUTPUT = []
 
@@ -152,13 +152,17 @@ def getState(program_input, databuswidth):
       if LABEL.get(lbl, None) == None:
         LABEL[lbl] = x
         reverseLABEL[x] = lbl
+  for x,ins in enumerate(program):
+    for y,opr in enumerate(program[x].operandList):
+      if LABEL.get(opr, None) != None:
+        program[x].operandList[y] = str(LABEL[opr])
+      elif opr[0] == "#":
+        program[x].operandList[y] = str(int(opr[1:]) + offset)
+  for x,ins in enumerate(program):
     if ins.opcode not in ["DW"]:
       RAM.append("-")
     else:
-      RAM.append(ins.operandList[0])
-    for y,operand in enumerate(ins.operandList):
-      if operand[0] == "#":
-        program[x].operandList[y] = str(int(operand[1:]) + offset)
+      RAM.append(int(ins.operandList[0]))
   colorama.init()
   step = False
   show = False
@@ -176,17 +180,9 @@ def getState(program_input, databuswidth):
     operands = ins.operandList
     opcode = ins.opcode
     if opcode == "IMM":
-      if operands[1][0] == ".":
-        REG[int(operands[0][1:])] = LABEL[operands[1]]
-      else:
-        REG[int(operands[0][1:])] = int(operands[1])
+      REG[int(operands[0][1:])] = int(operands[1])
     elif opcode == "STR":
-      if operands[0][0] == "$":
-        addr = REG[int(operands[0][1:])]
-      elif operands[0][0] == ".":
-        addr = LABEL.get(operands[0])
-      else:
-        addr = int(operands[0])
+      addr = REG[int(operands[0][1:])]
       if addr < len(RAM) or (abs(addr-len(RAM)) <= abs(addr-(maxaddr-len(STACK)))):
         while addr >= len(RAM):
           RAM.append("-")
@@ -197,12 +193,7 @@ def getState(program_input, databuswidth):
           STACK.append("-")
         STACK[addr] = REG[int(operands[1][1:])]
     elif opcode == "LOD":
-      if operands[1][0] == "$":
-        addr = REG[int(operands[1][1:])]
-      elif operands[1][0] == ".":
-        addr = LABEL.get(operands[1])
-      else:
-        addr = int(operands[1])
+      addr = REG[int(operands[1][1:])]
       if addr < len(RAM) or (abs(addr-len(RAM)) <= abs(addr-(maxaddr-len(STACK)))):
         while addr >= len(RAM):
           RAM.append("-")
@@ -211,7 +202,7 @@ def getState(program_input, databuswidth):
         addr = maxaddr - addr
         while addr >= len(STACK):
           STACK.append("-")
-        REG[int(operands[0][1:])] = STACK[addr]
+        REG[int(operands[0][1:])] = int(STACK[addr])
     elif opcode == "JMP":
       PC = REG[int(operands[0][1:])]
     elif opcode == "BGE":
@@ -233,11 +224,6 @@ def getState(program_input, databuswidth):
     elif opcode == "SUB":
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] + (~REG[int(operands[2][1:])] % 2**(BITS))+1
       updateFlags(int(operands[0][1:]))
-    elif opcode == "JMP":
-      if operands[0][0] == "$":
-        PC = REG[int(operands[0][1:])]
-      else:
-        PC = LABEL[operands[0]]
     elif opcode == "RSH":
       REG[int(operands[0][1:])] = REG[int(operands[1][1:])] // 2
       updateFlags(int(operands[0][1:]))
@@ -449,17 +435,24 @@ def main():
   program = importProgram(progName)
   program = removeComments(program)
   program = convertToInstructions(program)
+  #print('\x1b[2J')
+  #state = getState(program, databuswidth)
   try:
     print('\x1b[2J')
     state = getState(program, databuswidth)
   except Exception as ex:
-    print("------------ The emulator has crashed! :( ------------")
+    print("------------ The emulator has crashed! :( --------------------------")
     print(f"URCL instruction number: {PC} (this does not count labels)")
+    print("--------------------------------------------------------------------")
     print(traceback.format_exc())
     print("------------ Potential causes (in order of probability) ------------")
-    if ex.__class__ is TypeError:
-      print(f"├ 1. You're LOD-ing from a memory address that hasn't been written to yet.")
-    elif ex.__class__ is IndexError:
-      print(f"Index out of bounds error! You're either:\n - 1) Using too many registers (this CPU only has {databuswidth}), try using some memory instead.\n - 2) Using too much memory (this CPU only has {2**BITS} words), try making your program more efficient, or target {databuswidth*2} bit CPUs instead.")
+    if ex.__class__ is IndexError:
+      print(f"├ [███──] Your program does not have a HLT.")
+      print(f"├ [█────] Your program uses too much RAM for this bit width. (Max is {(2**BITS)-1})")
+      print(f"├ [█────] Your program uses too many registers. (Max is 32)")
+    elif ex.__class__ is ValueError:
+      print(f"├ [███──] You're LOD-ing from a memory address that hasn't been written to yet.")
+      print(f"├ [██───] You're operating on a register that hasn't been initialised with IMM yet.")
+    input("--------------------------------------------------------------------")
 if __name__ == "__main__":
   main()

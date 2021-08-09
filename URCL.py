@@ -326,10 +326,10 @@ cmplx_subs = {
     "@^",
     "MOV ^1, <C>",
     "MOV <A>, <B>",
-    "BRL +4, <B>, ^1",
+    "BRL +4, <A>, ^1",
     "SUB <A>, <A>, ^1",
+    "JMP -2",
     "@V",
-    "JMP -3",
     "NOP"
   ],
   "BSR": [
@@ -339,8 +339,8 @@ cmplx_subs = {
     "BRZ +5, ^1",
     "RSH <A>, <A>",
     "DEC ^1, ^1",
+    "JMP -3",
     "@V",
-    "JMP -4",
     "NOP"
   ],
   "BSL": [
@@ -350,8 +350,8 @@ cmplx_subs = {
     "BRZ +5, ^1",
     "LSH <A>, <A>",
     "DEC ^1, ^1",
+    "JMP -3",
     "@V",
-    "JMP -4",
     "NOP"
   ],
   "SRS": [
