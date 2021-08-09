@@ -612,7 +612,7 @@ def evaluateBitPattern(bitPattern):
   elif opr == "LHALF":
     opr = "(0)(1)"
   elif opr == "BITS":
-    opr = BITS
+    return operand("number", BITS)
   if "+" in opr:
     opr, c = opr.split("+")
     c = int(c)

@@ -367,6 +367,10 @@ def getState(program_input, databuswidth):
         flg1 = True
         scnt += 1
         columns[0].append(f"├ {addr2:>{maxwidth}}: {val}")
+      if scnt > 17:
+        columns[0].append(f"├ (approx. {len(STACK)-x} more values)")
+        scnt += len(STACK)-x
+        break
     if not flg1:
       columns[0].append(f"├ {'(all empty)':>{maxwidth}}")
     STACK.reverse()
