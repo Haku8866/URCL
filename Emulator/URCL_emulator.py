@@ -16,7 +16,7 @@ CONSOLE_Y = 0
 
 PAGE = 0
 ADDRESS = 0
-FILE = {}
+FILE = []
 
 class instruction:
   def __init__(self, label, opcode, operandList):
@@ -45,6 +45,16 @@ def updateFlags(reg):
   val = (val + 2**BITS) % (2**BITS)
   REG[reg] = val
   return
+
+def splitIntoBytes(val):
+  global BITS
+  words = BITS//8
+  if not words:
+    words = 1
+  out = []
+  for w in range(words):
+    out.append(val>>((words-w-1)*8))
+  return out
 
 def importProgram(name):
   try: return [line.strip() for line in open(name, "r", encoding="utf8")]
@@ -254,14 +264,28 @@ def getState(program_input, databuswidth):
           REG[int(operands[0][1:])] = randint(0, (2**BITS)-1)
         elif operands[1] == "%BUS":
           if not FILE:
-            if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.json"):
-              with open(f"Emulator/Storage/{BITS}_{PAGE}.json", "x") as f:
-                json.dump({0:0}, f)
+            if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "x") as f:
+                f.write(bytearray(splitIntoBytes(0)))
                 f.close()
-            with open(f"Emulator/Storage/{BITS}_{PAGE}.json") as f:
-              FILE = json.load(f)
+            words = BITS//8
+            if not words:
+              words = 1
+            with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "rb") as f:
+              while True:
+                fullword = f.read(words)
+                if fullword:
+                  newfullword = 0
+                  for w,word in enumerate(fullword):
+                    newfullword += int(word)<<(8*(words-w-1))
+                  FILE.append(newfullword)
+                else:
+                  break
               f.close()
-          REG[int(operands[0][1:])] = FILE[str(ADDRESS)]
+          try:
+            REG[int(operands[0][1:])] = FILE[ADDRESS]
+          except:
+            REG[int(operands[0][1:])] = 0
         elif operands[1] == "%TEXT":
           special = {
             r"\n": 10,
@@ -300,25 +324,54 @@ def getState(program_input, databuswidth):
         PAGE = REG[int(operands[1][1:])]
         if oldPage != PAGE:
           if not FILE:
-            if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.json"):
-              with open(f"Emulator/Storage/{BITS}_{PAGE}.json", "x") as f:
-                json.dump({0:0}, f)
+            words = BITS//8
+            if not words:
+              words = 1
+            if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "x") as f:
+                f.write(bytearray(splitIntoBytes(0)))
                 f.close()
-            with open(f"Emulator/Storage/{BITS}_{PAGE}.json") as f:
-              FILE = json.load(f)
+            with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "rb") as f:
+              while True:
+                fullword = f.read(words)
+                if fullword:
+                  newfullword = 0
+                  for w,word in enumerate(fullword):
+                    newfullword += word<<(8*(words-w-1))
+                  FILE.append(newfullword)
+                  FILE.append(f.read(2))
+                else:
+                  break
               f.close()
       elif operands[0] == "%BUS":
         if not FILE:
-          if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.json"):
-            with open(f"Emulator/Storage/{BITS}_{PAGE}.json", "x") as f:
-              json.dump({0:0}, f)
+          words = BITS//8
+          if not words:
+            words = 1
+          if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
+            with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "x") as f:
+              f.write(bytearray(splitIntoBytes(0)))
               f.close()
-          with open(f"Emulator/Storage/{BITS}_{PAGE}.json") as f:
-            FILE = json.load(f)
+          with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "rb") as f:
+            while True:
+              fullword = f.read(words)
+              if fullword:
+                newfullword = 0
+                for w,word in enumerate(fullword):
+                  newfullword += word<<(8*(words-w-1))
+                FILE.append(newfullword)
+                FILE.append(f.read(2))
+              else:
+                break
             f.close()
-        FILE[str(ADDRESS)] = REG[int(operands[1][1:])]
-        with open(f"Emulator/Storage/{BITS}_{PAGE}.json", "w") as f:
-          json.dump(FILE, f)
+        while ADDRESS >= len(FILE):
+          FILE.append(0)
+        FILE[ADDRESS] = REG[int(operands[1][1:])]
+        with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
+          fileAsBytes = []
+          for num in FILE:
+            fileAsBytes += splitIntoBytes(num)
+          f.write(bytearray(fileAsBytes))
           f.close()
       elif operands[0] == "%TEXT":
         writeCharToConsole(REG[int(operands[1][1:])])
