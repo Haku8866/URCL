@@ -1565,6 +1565,44 @@ def fullMultiword(program):
         tempregptr -= 1
       if "MW_" in ins.opcode.name:
         opc = ins.opcode.name[3:]
+        # Multiword translations:
+        # ---------- CORE
+        # IMM - DONE
+        # RSH - DONE
+        # BGE - DONE
+        # NOR - DONE
+        # ADD - DONE
+        # LOD - DONE
+        # STR - DONE
+        # ---------- BASIC
+        # MOV - DONE
+        # BRG - DONE
+        # BRL - DONE
+        # BLE - DONE
+        # BRE - DONE
+        # BNE - DONE
+        # BRZ - TODO
+        # BNZ - TODO
+        # BRN - TODO
+        # BRP - TODO
+        # BRC - TODO
+        # BNC - TODO
+        # SUB - TODO
+        # INC - TODO
+        # DEC - TODO
+        # LSH - TODO
+        # NEG - TODO
+        # AND - TODO
+        # OR  - TODO
+        # XOR - TODO
+        # NOT - TODO
+        # XNOR- TODO
+        # NAND- TODO
+        # NOR - TODO
+        # POP - TODO
+        # PSH - TODO
+        # CAL - TODO
+        # RET - TODO
         if opc == "IMM": # WORKS
           for w in range(WORDS):
             translation += [f"IMM <A>[{w}], <B>[{w}]"]
@@ -1582,7 +1620,80 @@ def fullMultiword(program):
                 ]
             translation += [
               ".exec",
-              f"BGE <A>, $0, $0",
+              f"JMP <A>",
+              ".skip",
+              "NOP"
+              ]
+        elif opc == "BRE":
+          if ins.operandList[1].equals(ins.operandList[2]):
+            translation += ["JMP <A>"]
+          else:
+            for w in range(WORDS):
+              translation += [
+                f"BNE .skip, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
+                ]
+            translation += [
+              f"JMP <A>",
+              ".skip",
+              "NOP"
+              ]
+        elif opc == "BNE":
+          if ins.operandList[1].equals(ins.operandList[2]):
+            translation += ["JMP <A>"]
+          else:
+            for w in range(WORDS):
+              translation += [
+                f"BNE .exec, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
+                ]
+            translation += [
+              "JMP .skip"
+              ".exec",
+              "JMP <A>",
+              ".skip",
+              "NOP"
+              ]
+        elif opc == "BLE":
+          if ins.operandList[1].equals(ins.operandList[2]):
+            translation += ["JMP <A>"]
+          else:
+            for w in range(WORDS):
+              translation += [
+                f"BRL .exec, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]",
+                f"BRG .skip, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
+                ]
+            translation += [
+              ".exec",
+              f"JMP <A>",
+              ".skip",
+              "NOP"
+              ]
+        elif opc == "BRL":
+          if ins.operandList[1].equals(ins.operandList[2]):
+            translation += ["NOP"]
+          else:
+            for w in range(WORDS):
+              translation += [
+                f"BRL .exec, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]",
+                f"BGE .skip, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
+                ]
+            translation += [
+              ".exec",
+              f"JMP <A>",
+              ".skip",
+              "NOP"
+              ]
+        elif opc == "BRG":
+          if ins.operandList[1].equals(ins.operandList[2]):
+            translation += ["NOP"]
+          else:
+            for w in range(WORDS):
+              translation += [
+                f"BRG .exec, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]",
+                f"BLE .skip, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
+                ]
+            translation += [
+              ".exec",
+              f"JMP <A>",
               ".skip",
               "NOP"
               ]

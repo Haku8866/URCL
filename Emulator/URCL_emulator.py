@@ -254,14 +254,14 @@ def getState(program_input, databuswidth):
           REG[int(operands[0][1:])] = randint(0, (2**BITS)-1)
         elif operands[1] == "%BUS":
           if not FILE:
-            if not os.path.isfile(f"Emulator/Storage/{BITS}_bit_storage.json"):
-              with open(f"Emulator/Storage/{BITS}_bit_storage.json", "x") as f:
-                json.dump({0:{}}, f)
+            if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.json"):
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.json", "x") as f:
+                json.dump({0:0}, f)
                 f.close()
-            with open(f"Emulator/Storage/{BITS}_bit_storage.json") as f:
+            with open(f"Emulator/Storage/{BITS}_{PAGE}.json") as f:
               FILE = json.load(f)
               f.close()
-          REG[int(operands[0][1:])] = FILE[str(PAGE)][str(ADDRESS)]
+          REG[int(operands[0][1:])] = FILE[str(ADDRESS)]
         elif operands[1] == "%TEXT":
           special = {
             r"\n": 10,
@@ -296,18 +296,28 @@ def getState(program_input, databuswidth):
       elif operands[0] == "%ADDR":
         ADDRESS = REG[int(operands[1][1:])]
       elif operands[0] == "%PAGE":
+        oldPage = PAGE
         PAGE = REG[int(operands[1][1:])]
+        if oldPage != PAGE:
+          if not FILE:
+            if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.json"):
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.json", "x") as f:
+                json.dump({0:0}, f)
+                f.close()
+            with open(f"Emulator/Storage/{BITS}_{PAGE}.json") as f:
+              FILE = json.load(f)
+              f.close()
       elif operands[0] == "%BUS":
         if not FILE:
-          if not os.path.isfile(f"Emulator/Storage/{BITS}_bit_storage.json"):
-            with open(f"Emulator/Storage/{BITS}_bit_storage.json", "x") as f:
-              json.dump({0:{}}, f)
+          if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.json"):
+            with open(f"Emulator/Storage/{BITS}_{PAGE}.json", "x") as f:
+              json.dump({0:0}, f)
               f.close()
-          with open(f"Emulator/Storage/{BITS}_bit_storage.json") as f:
+          with open(f"Emulator/Storage/{BITS}_{PAGE}.json") as f:
             FILE = json.load(f)
             f.close()
-        FILE[str(PAGE)][str(ADDRESS)] = REG[int(operands[1][1:])]
-        with open(f"Emulator/Storage/{BITS}_bit_storage.json", "w") as f:
+        FILE[str(ADDRESS)] = REG[int(operands[1][1:])]
+        with open(f"Emulator/Storage/{BITS}_{PAGE}.json", "w") as f:
           json.dump(FILE, f)
           f.close()
       elif operands[0] == "%TEXT":
