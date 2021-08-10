@@ -369,8 +369,8 @@ cmplx_subs = {
     "BRZ +5, ^1",
     "SRS <A>, <A>",
     "DEC ^1, ^1",
+    "JMP -3",
     "@V",
-    "JMP -4",
     "NOP"
   ],
   "SETE": [ # IMPROVED
@@ -1712,6 +1712,38 @@ def convertOperandsWithHeaders(program):
           program[x].operandList[y].value = (opr.value)&((2**PROGBITS)-1)
   return program
 
+def removeDW(program):
+  count = 0
+  # Find out how much memory is going to be required
+  for x, ins in enumerate(program):
+    if ins.opcode.name == "DW":
+      count += 1
+  # Free up the required memory slots
+  for x, ins in enumerate(program):
+    for y, opr in enumerate(program[x].operandList):
+      if opr.type == "memAddr":
+        program[x].operandList[y].value += count
+  # Move the values in 'DW's to memory with 'STR's
+  insert = []
+  count = 0
+  labelDict = {}
+  for x, ins in enumerate(program):
+    if ins.opcode.name == "DW":
+      for lbl in ins.label:
+        labelDict[lbl.value] = count
+      opr = ins.operandList[0]
+      insert.append(f"STR #{count} {prefixes.get(opr.type, '')}{opr.value}")
+      count += 1
+      program[x] = parseIns("NOP")
+  insert = parseURCL(insert)
+  program[0:0] = insert
+  for x, ins in enumerate(program):
+    for y, opr in enumerate(program[x].operandList):
+      if opr.type == "label" and labelDict.get(opr.value, None) is not None:
+        program[x].operandList[y].type = "memAddr"
+        program[x].operandList[y].value = labelDict[opr.value]
+  return program
+
 def main():
   global opcodes
   global STACKUSAGE
@@ -1732,6 +1764,8 @@ def main():
   program = enableMultiWord(program)
   program = regSubstitution(program)
   program = replaceComplex(program)
+  if not ISA.CPU_stats["RUN_RAM"]:
+    program = removeDW(program)
   if not MWFULL:
     program = convertMultiWordInstructions(program)
   FINALSUB = True

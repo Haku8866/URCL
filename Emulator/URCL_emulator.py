@@ -353,8 +353,9 @@ def getState(program_input, databuswidth):
         mcnt += 1
         columns[0].append(f"├ {x:>{maxwidth}}: {val} ({lbl})" if lbl else f"├ {x:>{maxwidth}}: {val}")
       if mcnt > 17:
-        columns[0].append(f"├ (approx. {len(RAM)-x} more values)")
-        mcnt += len(RAM)-x
+        remaining = RAM[x+1:].count("-")
+        columns[0].append(f"├ (approx. {len(RAM)-x-remaining} more values)")
+        mcnt += len(RAM)-x-remaining
         break
     if flg0:
       columns[0].append(f"├ {'...':>{maxwidth}}")
@@ -445,18 +446,21 @@ def main():
     print('\x1b[2J')
     state = getState(program, databuswidth)
   except Exception as ex:
-    print("------------ The emulator has crashed! :( --------------------------")
-    print(f"URCL instruction number: {PC} (this does not count labels)")
-    print("--------------------------------------------------------------------")
-    print(traceback.format_exc())
-    print("------------ Potential causes (in order of probability) ------------")
-    if ex.__class__ is IndexError:
-      print(f"├ [███──] Your program does not have a HLT.")
-      print(f"├ [█────] Your program uses too much RAM for this bit width. (Max is {(2**BITS)-1})")
-      print(f"├ [█────] Your program uses too many registers. (Max is 32)")
-    elif ex.__class__ is ValueError:
-      print(f"├ [███──] You're LOD-ing from a memory address that hasn't been written to yet.")
-      print(f"├ [██───] You're operating on a register that hasn't been initialised with IMM yet.")
-    input("--------------------------------------------------------------------")
+    if ex.__class__ is KeyboardInterrupt:
+      print("------------ Program exited. ---------------------------------------")
+    else:
+      print("------------ The emulator has crashed! :( --------------------------")
+      print(f"URCL instruction number: {PC} (this does not count labels)")
+      print("--------------------------------------------------------------------")
+      print(traceback.format_exc())
+      print("------------ Potential causes (in order of probability) ------------")
+      if ex.__class__ is IndexError:
+        print(f"├ [███──] Your program does not have a HLT.")
+        print(f"├ [█────] Your program uses too much RAM for this bit width. (Max is {(2**BITS)-1})")
+        print(f"├ [█────] Your program uses too many registers. (Max is 32)")
+      elif ex.__class__ is ValueError:
+        print(f"├ [███──] You're LOD-ing from a memory address that hasn't been written to yet.")
+        print(f"├ [██───] You're operating on a register that hasn't been initialised with IMM yet.")
+      print("--------------------------------------------------------------------")
 if __name__ == "__main__":
   main()
