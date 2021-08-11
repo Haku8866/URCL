@@ -52,8 +52,8 @@ def splitIntoBytes(val):
   if not words:
     words = 1
   out = []
-  for w in range(words):
-    out.append(val>>((words-w-1)*8))
+  for w in range(words, 0, -1):
+    out.append((val>>((w-1)*8))&(2**8-1))
   return out
 
 def importProgram(name):
@@ -265,7 +265,7 @@ def getState(program_input, databuswidth):
         elif operands[1] == "%BUS":
           if not FILE:
             if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
-              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "x") as f:
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
                 f.write(bytearray(splitIntoBytes(0)))
                 f.close()
             words = BITS//8
@@ -328,7 +328,7 @@ def getState(program_input, databuswidth):
             if not words:
               words = 1
             if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
-              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "x") as f:
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
                 f.write(bytearray(splitIntoBytes(0)))
                 f.close()
             with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "rb") as f:
@@ -349,7 +349,7 @@ def getState(program_input, databuswidth):
           if not words:
             words = 1
           if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
-            with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "x") as f:
+            with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
               f.write(bytearray(splitIntoBytes(0)))
               f.close()
           with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "rb") as f:
