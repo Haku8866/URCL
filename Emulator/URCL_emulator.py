@@ -337,7 +337,7 @@ def getState(program_input, databuswidth):
                 if fullword:
                   newfullword = 0
                   for w,word in enumerate(fullword):
-                    newfullword += word<<(8*(words-w-1))
+                    newfullword += int(word)<<(8*(words-w-1))
                   FILE.append(newfullword)
                   FILE.append(f.read(2))
                 else:
@@ -358,7 +358,7 @@ def getState(program_input, databuswidth):
               if fullword:
                 newfullword = 0
                 for w,word in enumerate(fullword):
-                  newfullword += word<<(8*(words-w-1))
+                  newfullword += int(word)<<(8*(words-w-1))
                 FILE.append(newfullword)
                 FILE.append(f.read(2))
               else:

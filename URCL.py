@@ -502,7 +502,7 @@ def convertOperands(program):
     for y, lab in enumerate(program[x].label):
       program[x].label[y] = operand("label", lab)
     for y, opr in enumerate(program[x].operandList):
-      if "[" in opr:
+      if "[" in opr and opr != '"["' and opr != "'['":
         opr, word = opr.split("[")
         word = int(word.rstrip("]"))
       else:
