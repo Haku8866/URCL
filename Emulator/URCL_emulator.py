@@ -71,7 +71,7 @@ def removeComments(program):
         line[x] = "$" + line[x][1:]
       if len(line[x]) >= 2 and line[x][0] == "M" and line[x][1].isnumeric():
         line[x] = "#" + line[x][1:]
-      line[x] = "".join(list(filter(lambda a: (a in " _.-+=*<()>$#%" or a.isnumeric() or a.isalpha()), line[x])))
+      line[x] = "".join(list(filter(lambda a: (a not in "," or a.isnumeric() or a.isalpha()), line[x])))
     program[y] = " ".join(line)
   return list(filter(None, program))
 
@@ -84,12 +84,11 @@ def convertToInstructions(program):
     operandList, line, operandCount, opcode = ([],program[x].split(),operands.get(program[x].split()[0], None),program[x].split()[0],)
     if line[0][0] == ".":
       label.append(line[0])
-    elif operandCount != None:
+      continue
+    if len(line) > 1:
       operandList = line[1:]
-      code.append(instruction(label, opcode, operandList))
-      label = []
-    else:
-      end(f"Unknown instruction '{line[0]}'","- try checking:\n1. Is the file written in the lastest version of URCL?\n2. If so, has anyone raised this missing feature on the URCL discord yet? (https://discord.gg/jWRr2vx)",)
+    code.append(instruction(label, opcode, operandList))
+    label = []
   return list(filter(None, code))
 
 def writeCharToConsole(char):
@@ -164,10 +163,17 @@ def getState(program_input, databuswidth):
         reverseLABEL[x] = lbl
   for x,ins in enumerate(program):
     for y,opr in enumerate(program[x].operandList):
+      word = 0
+      if "[" in opr:
+        opr, word = opr.split("[")
+        word = int(word[:-1])
       if LABEL.get(opr, None) != None:
         program[x].operandList[y] = str(LABEL[opr])
-      elif opr[0] == "#":
+      if opr[0] == "#":
         program[x].operandList[y] = str(int(opr[1:]) + offset)
+      if opr[0] not in "$%":
+        program[x].operandList[y] = str((int(program[x].operandList[y])>>BITS*word)&(2**(BITS)-1))
+
   for x,ins in enumerate(program):
     if ins.opcode not in ["DW"]:
       RAM.append("-")
@@ -205,8 +211,6 @@ def getState(program_input, databuswidth):
     elif opcode == "LOD":
       addr = REG[int(operands[1][1:])]
       if addr < len(RAM) or (abs(addr-len(RAM)) <= abs(addr-(maxaddr-len(STACK)))):
-        while addr >= len(RAM):
-          RAM.append("-")
         REG[int(operands[0][1:])] = int(RAM[addr])
       else:
         addr = maxaddr - addr
@@ -299,7 +303,6 @@ def getState(program_input, databuswidth):
             char = special[char]
           else:
             char = ord(char)
-          #writeCharToConsole(char)
           REG[int(operands[0][1:])] = char
           printDisplay = True
         elif operands[1] in ("%ASCII","%CHAR5","%CHAR6","%ASCII7","%UTF8"):
@@ -315,13 +318,14 @@ def getState(program_input, databuswidth):
       REG[int(operands[0][1:])] = REG[int(operands[0][1:])] & ((2**BITS)-1)
     elif opcode == "OUT":
       printDisplay = True
+      val = REG[int(operands[1][1:])]
       if operands[0] == "%NUMB":
-        OUTPUT.append(REG[int(operands[1][1:])])
+        OUTPUT.append(val)
       elif operands[0] == "%ADDR":
-        ADDRESS = REG[int(operands[1][1:])]
+        ADDRESS = val
       elif operands[0] == "%PAGE":
         oldPage = PAGE
-        PAGE = REG[int(operands[1][1:])]
+        PAGE = val
         if oldPage != PAGE:
           if not FILE:
             words = BITS//8
@@ -366,7 +370,7 @@ def getState(program_input, databuswidth):
             f.close()
         while ADDRESS >= len(FILE):
           FILE.append(0)
-        FILE[ADDRESS] = REG[int(operands[1][1:])]
+        FILE[ADDRESS] = val
         with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
           fileAsBytes = []
           for num in FILE:
@@ -374,24 +378,24 @@ def getState(program_input, databuswidth):
           f.write(bytearray(fileAsBytes))
           f.close()
       elif operands[0] == "%TEXT":
-        writeCharToConsole(REG[int(operands[1][1:])])
+        writeCharToConsole(val)
       elif operands[0] == "%BIN":
-        OUTPUT.append(bin(REG[int(operands[1][1:])]))
+        OUTPUT.append(bin(val))
       elif operands[0] == "%HEX":
-        OUTPUT.append(hex(REG[int(operands[1][1:])]))
+        OUTPUT.append(hex(val))
       elif operands[0] == "%X":
-        PIX_DISPLAY_X = REG[int(operands[1][1:])]
+        PIX_DISPLAY_X = val
       elif operands[0] == "%Y":
-        PIX_DISPLAY_Y = REG[int(operands[1][1:])]
-      elif operands[0] in ("%TEXT","%ASCII","%CHAR5","%CHAR6","%ASCII7","%UTF8"):
-        OUTPUT.append(REG[chr(int(operands[1][1:]))])
+        PIX_DISPLAY_Y = val
+      elif operands[0] in ("%ASCII","%CHAR5","%CHAR6","%ASCII7","%UTF8"):
+        OUTPUT.append(val)
       elif operands[0] == "%COLOR" or operands[0] == "%COLOUR":
         draw = "  "
-        if REG[int(operands[1][1:])] != 0:
+        if val != 0:
           draw = "██"
         PIX_DISPLAY[PIX_DISPLAY_Y][PIX_DISPLAY_X] = draw
       else:
-        OUTPUT.append(REG[int(operands[1][1:])])
+        OUTPUT.append(val)
     elif opcode == "BRZ":
       if REG[int(operands[1][1:])] == 0:
         PC = REG[int(operands[0][1:])]
@@ -402,7 +406,157 @@ def getState(program_input, databuswidth):
       break
     elif opcode == "NOP":
       pass
-    if not printDisplay and not step and not show:
+    elif opcode[0].isnumeric() and "_" in opcode:
+      w, opcode = opcode.split("_")
+      w = int(w)
+      if opcode == "BGE":
+        if REG[int(operands[-2][1:])] >= REG[int(operands[-1][1:])]:
+          PC = sum(REG[int(operands[x][1:])]<<BITS*(w-x-1) for x in range(w))
+      elif opcode == "LOD":
+        REG[int(operands[0][1:])] = int(RAM[sum(REG[int(operands[x+1][1:])]<<BITS*(w-x-1) for x in range(w))])
+      elif opcode == "STR":
+        val = sum(REG[int(operands[x][1:])]<<BITS*(w-x-1) for x in range(w))
+        while len(RAM) <= val:
+          RAM.append("-")
+        RAM[val] = REG[int(operands[-1][1:])]
+      elif opcode == "OUT":
+        val = sum(REG[int(operands[x+1][1:])]<<BITS*(w-x-1) for x in range(w))
+        printDisplay = True
+        if operands[0] == "%NUMB":
+          OUTPUT.append(val)
+        elif operands[0] == "%ADDR":
+          ADDRESS = val
+        elif operands[0] == "%PAGE":
+          oldPage = PAGE
+          PAGE = val
+          if oldPage != PAGE:
+            if not FILE:
+              words = BITS//8
+              if not words:
+                words = 1
+              if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
+                with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
+                  f.write(bytearray(splitIntoBytes(0)))
+                  f.close()
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "rb") as f:
+                while True:
+                  fullword = f.read(words)
+                  if fullword:
+                    newfullword = 0
+                    for z,word in enumerate(fullword):
+                      newfullword += int(word)<<(8*(words-z-1))
+                    FILE.append(newfullword)
+                    FILE.append(f.read(2))
+                  else:
+                    break
+                f.close()
+        elif operands[0] == "%BUS":
+          if not FILE:
+            words = BITS//8
+            if not words:
+              words = 1
+            if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
+                f.write(bytearray(splitIntoBytes(0)))
+                f.close()
+            with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "rb") as f:
+              while True:
+                fullword = f.read(words)
+                if fullword:
+                  newfullword = 0
+                  for z,word in enumerate(fullword):
+                    newfullword += int(word)<<(8*(words-z-1))
+                  FILE.append(newfullword)
+                  FILE.append(f.read(2))
+                else:
+                  break
+              f.close()
+          while ADDRESS >= len(FILE):
+            FILE.append(0)
+          FILE[ADDRESS] = val
+          with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
+            fileAsBytes = []
+            for num in FILE:
+              fileAsBytes += splitIntoBytes(num)
+            f.write(bytearray(fileAsBytes))
+            f.close()
+        elif operands[0] == "%TEXT":
+          writeCharToConsole(val)
+        elif operands[0] == "%BIN":
+          OUTPUT.append(bin(val))
+        elif operands[0] == "%HEX":
+          OUTPUT.append(hex(val))
+        elif operands[0] == "%X":
+          PIX_DISPLAY_X = val
+        elif operands[0] == "%Y":
+          PIX_DISPLAY_Y = val
+        elif operands[0] in ("%ASCII","%CHAR5","%CHAR6","%ASCII7","%UTF8"):
+          OUTPUT.append(val)
+        elif operands[0] == "%COLOR" or operands[0] == "%COLOUR":
+          draw = "  "
+          if val != 0:
+            draw = "██"
+          PIX_DISPLAY[PIX_DISPLAY_Y][PIX_DISPLAY_X] = draw
+        else:
+          OUTPUT.append(val)
+      elif opcode == "IN":
+        inval = 0
+        try:
+          if operands[-1] == "%RNG":
+            inval = randint(0, (2**BITS)-1)
+          elif operands[-1] == "%BUS":
+            if not FILE:
+              if not os.path.isfile(f"Emulator/Storage/{BITS}_{PAGE}.bin"):
+                with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "w+b") as f:
+                  f.write(bytearray(splitIntoBytes(0)))
+                  f.close()
+              words = BITS//8
+              if not words:
+                words = 1
+              with open(f"Emulator/Storage/{BITS}_{PAGE}.bin", "rb") as f:
+                while True:
+                  fullword = f.read(words)
+                  if fullword:
+                    newfullword = 0
+                    for z,word in enumerate(fullword):
+                      newfullword += int(word)<<(8*(words-z-1))
+                    FILE.append(newfullword)
+                  else:
+                    break
+                f.close()
+            try:
+              inval = FILE[ADDRESS]
+            except:
+              inval = 0
+          elif operands[-1] == "%TEXT":
+            special = {
+              r"\n": 10,
+              r"\LF": 10,
+              r"\BS": 8,
+              r"\CR": 13,
+              r"\SP": 32,
+            }
+            char = input(f"IN (char): ")
+            if special.get(char):
+              char = special[char]
+            else:
+              char = ord(char)
+            inval = char
+            printDisplay = True
+          elif operands[-1] in ("%ASCII","%CHAR5","%CHAR6","%ASCII7","%UTF8"):
+            inval = ord(input(f"IN (char): "))
+          elif operands[-1] == "%BIN":
+            inval = int(input(f"IN (bin ): "), 2)
+          elif operands[-1] == "%HEX":
+            inval = int(input(f"IN (hex ): "), 16)
+          else:
+            inval = int(input(f"IN (num ): "))
+        except:
+          inval = 0
+        regs = operands[:-1].copy()
+        for r, register in enumerate(regs):
+          REG[int(register[1:])] = (inval>>(len(regs)-r-1)*BITS)&((2**BITS)-1)
+    if not printDisplay and not step and not (show and cycles % 1000 == 0):
       continue
     printDisplay = False
     columns = [[],[],[],[],[]]
