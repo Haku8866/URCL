@@ -151,7 +151,7 @@ def getState(program_input, databuswidth):
   BITS = databuswidth
   RAM = []
   STACK = ["-" for x in range(10)]
-  REG = ["-" for x in range(32)]
+  REG = ["-" for x in range(128)]
   LABEL = {}
   OUTPUT = []
 

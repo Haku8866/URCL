@@ -564,6 +564,7 @@ def readHeaders(program):
   global MAXREG
   global IMPORTS
   global PROGBITS
+  global BITS
   global MWADDR
   global MWLABEL
   global MWSP
@@ -592,7 +593,10 @@ def readHeaders(program):
         elif ins.opcode.name == "@MWSP":
           MWSP = True
         elif ins.opcode.name == "@MWFULL":
-          MWFULL = True
+          if BITS < PROGBITS:
+            MWFULL = True
+          else:
+            MWFULL = False
         else:
           continue
         done = False
@@ -772,6 +776,8 @@ def replaceComplex(program):
     "BRN",
     "BRP",
     "INC",
+    "DEC",
+    "HLT"
     ]
   pickup = 0
   tempregptr = 0
@@ -1273,7 +1279,7 @@ def optimise(program):
     elif ins.opcode.name == "MOV" and ins.operandList[0].equals(ins.operandList[1]):
       snip = True
     elif ins.opcode.name == "MOV" and ins.operandList[1].type not in ("register", "stackPtr", "tempreg"):
-      ins.opcode.name == "IMM"
+      program[x].opcode.name = "IMM"
     elif ins.opcode.name == "ADD" and ins.operandList[2].type == "register" and ins.operandList[2].value == 0 and ins.operandList[0].equals(ins.operandList[1]):
       snip = True
     if snip:
@@ -1615,13 +1621,14 @@ def fullMultiword(program):
         # BRN - DONE
         # BRP - DONE
         # JMP - DONE
+        # HLT - DONE
         # BRC - TODO
         # BNC - TODO
-        # SUB - TODO
+        # SUB - NOT NEEDED?
         # INC - DONE
-        # DEC - TODO
-        # LSH - TODO
-        # NEG - TODO
+        # DEC - DONE
+        # LSH - DONE
+        # NEG - NOT NEEDED?
         # AND - DONE
         # OR  - DONE
         # XOR - DONE
@@ -1636,13 +1643,24 @@ def fullMultiword(program):
           for w in range(WORDS):
             translation += [f"IMM <A>[{w}], <B>[{w}]"]
         elif opc == "INC":
-            translation += ["MW_MOV <A>, <B>"]
+            if not ins.operandList[0].equals(ins.operandList[1]):
+              translation.append("MW_MOV <A>, <B>")
             for w in range(WORDS):
               translation += [
                 f"INC <A>[{w}], <A>[{w}]",
                 f"BNZ .end, <A>[{w}]",
               ]
-            translation = translation[:-1]
+            translation.pop()
+            translation += [".end", "NOP"]
+        elif opc == "DEC":
+            if not ins.operandList[0].equals(ins.operandList[1]):
+              translation.append("MW_MOV <A>, <B>")
+            for w in range(WORDS):
+              translation += [
+                f"DEC <A>[{w}], <A>[{w}]",
+                f"BNE .end, <A>[{w}], &(1)",
+              ]
+            translation.pop()
             translation += [".end", "NOP"]
         elif opc == "MOV": # WORKS
           if not ins.operandList[0].equals(ins.operandList[1]):
@@ -1664,9 +1682,9 @@ def fullMultiword(program):
               "NOP"
               ]
         elif opc == "JMP":
-          translation += [
-            "JMP <A>"
-            ]
+          translation.append("JMP <A>")
+        elif opc == "HLT":
+          translation.append("HLT")
         elif opc == "BRE":
           if ins.operandList[1].equals(ins.operandList[2]):
             translation += ["JMP <A>"]
@@ -1794,21 +1812,21 @@ def fullMultiword(program):
             "@V"
             ]
         elif opc == "STR": # WORKS
-          translation += ["@^", f"MW_IMM ^1, {MINRAM}", "@^", f"MW_MOV ^2, <A>"]
+          translation += ["@^", f"MW_MOV ^1, <A>"]
           for w in range(WORDS):
             translation += [
-              f"STR ^2, <B>[{w}]",
-              f"MW_ADD ^2, ^2, ^1",
+              f"STR ^1, <B>[{w}]",
+              f"MW_ADD ^1, ^1, {MINRAM}",
               ]
           translation.pop()
           translation += [
             "@V",
-            "@V"
             ]
         elif opc == "ADD": # WORKS
           translation += [
             "@^",
-            "IMM ^1, 0", "@^",
+            "IMM ^1, 0",
+            "@^",
             "MW_MOV ^2, <C>",
           ]
           if not ins.operandList[0].equals(ins.operandList[1]):
@@ -1838,20 +1856,71 @@ def fullMultiword(program):
                 f"OR ^1 ^1 ^2[{w}]",
               ]
           translation += ["@V", "@V"]
-        elif opc == "RSH": # WORKS
-          translation += ["@^", "IMM ^1, 0", "MW_MOV <A>, <B>"]
-          for w in range(WORDS):
-            translation += [
-              f"BRZ .skipinc{WORDS-1-w}, ^1",
-              f"AND ^1, <A>[{WORDS-1-w}], 1",
-              f"RSH <A>[{WORDS-1-w}], <A>[{WORDS-1-w}]",
-              f"ADD <A>[{WORDS-1-w}], <A>[{WORDS-1-w}], &1(0)",
-              f"JMP .next{w}",
-              f".skipinc{WORDS-1-w}",
-              f"AND ^1, <A>[{WORDS-1-w}], 1",
-              f"RSH <A>[{WORDS-1-w}], <A>[{WORDS-1-w}]",
-              f".next{w}"
+        elif opc == "LSH": # WORKS
+          translation += [
+            "@^", 
+            "IMM ^1, 0",
+            "@^",
+            "IMM ^2, 0"
             ]
+          if not ins.operandList[0].equals(ins.operandList[1]):
+            translation.append("MW_MOV <A>, <B>")
+          for w in range(WORDS):
+            if w == WORDS-1:
+              translation += [
+                f"@V"
+                f"BRZ +2 ^1",
+                f"IMM ^1 1",
+                f"LSH <A>[{w}], <A>[{w}]",
+                f"ADD <A>[{w}], <A>[{w}], ^1",
+              ]
+            elif w != 0:
+              translation += [
+                f"MOV ^2 ^1",
+                f"BRZ +2 ^2",
+                f"IMM ^2 1",
+                f"AND ^1, <A>[{w}], &1(0)",
+                f"LSH <A>[{w}], <A>[{w}]",
+                f"ADD <A>[{w}], <A>[{w}], ^2"
+              ]
+            else:
+              translation += [
+                f"AND ^1, <A>[{w}], &1(0)",
+                f"LSH <A>[{w}], <A>[{w}]",
+              ]
+          translation += ["@V"]
+        elif opc == "RSH": # WORKS
+          translation += [
+            "@^",
+            "IMM ^1, 0",
+            "@^",
+            "IMM ^2 0"
+            ]
+          if not ins.operandList[0].equals(ins.operandList[1]):
+            translation.append("MW_MOV <A>, <B>")
+          for w in range(WORDS):
+            if w == WORDS-1:
+              translation += [
+                f"@V",
+                f"BRZ +2 ^1",
+                f"IMM ^1 &1(0)",
+                f"RSH <A>[{WORDS-1-w}], <A>[{WORDS-1-w}]",
+                f"ADD <A>[{WORDS-1-w}], <A>[{WORDS-1-w}], ^1",
+              ]
+            elif w != 0:
+              translation += [
+                f"MOV ^2 ^1",
+                f"BRZ +2 ^2",
+                f"IMM ^2 &1(0)",
+                f"AND ^1, <A>[{WORDS-1-w}], 1",
+                f"RSH <A>[{WORDS-1-w}], <A>[{WORDS-1-w}]",
+                f"ADD <A>[{WORDS-1-w}], <A>[{WORDS-1-w}], ^2",
+              ]
+            else:
+              translation += [
+                f"AND ^1, <A>[{WORDS-1-w}], 1",
+                f"RSH <A>[{WORDS-1-w}], <A>[{WORDS-1-w}]",
+              ]
           translation += ["@V"]
         else:
           continue
