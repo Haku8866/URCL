@@ -87,6 +87,23 @@ def convertToInstructions(program):
       continue
     if len(line) > 1:
       operandList = line[1:]
+    cnt = 0
+    flg = False
+    for o in range(len(operandList)):
+      opr = operandList[o]
+      if opr[0] == "[":
+        cnt += 1
+        flg = True
+        operandList[o] = operandList[o][1:]
+        continue
+      elif opr.count("]") > opr.count("["):
+        cnt += 1
+        operandList[o] = operandList[o][:-1]
+        break
+      elif flg:
+        cnt += 1
+    if cnt >= 2:
+      opcode = f"{cnt}_{opcode}"
     code.append(instruction(label, opcode, operandList))
     label = []
   return list(filter(None, code))

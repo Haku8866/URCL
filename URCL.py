@@ -375,39 +375,45 @@ cmplx_subs = {
     "NOP"
   ],
   "SETE": [ # IMPROVED
-    "IMM <A>, 0",
-    "BNE +2, <B>, <C>",
+    "BNE +3, <B>, <C>",
     "IMM <A>, &(1)",
+    "JMP +2",
+    "IMM <A>, 0",
     "NOP"
   ],
   "SETNE": [ # IMPROVED
-    "IMM <A>, 0",
-    "BRE +2, <B>, <C>",
+    "BRE +3, <B>, <C>",
     "IMM <A>, &(1)",
+    "JMP +2",
+    "IMM <A>, 0",
     "NOP"
   ],
   "SETG": [ # IMPROVED
-    "IMM <A>, 0",
-    "BLE +2, <B>, <C>",
+    "BLE +3, <B>, <C>",
     "IMM <A>, &(1)",
+    "JMP +2",
+    "IMM <A>, 0",
     "NOP"
   ],
   "SETL": [ # IMPROVED
-    "IMM <A>, 0",
-    "BGE +2, <B>, <C>",
+    "BGE +3, <B>, <C>",
     "IMM <A>, &(1)",
+    "JMP +2",
+    "IMM <A>, 0",
     "NOP"
   ],
   "SETGE": [ # IMPROVED
-    "IMM <A>, 0",
-    "BRL +2, <B>, <C>",
+    "BRL +3, <B>, <C>",
     "IMM <A>, &(1)",
+    "JMP +2",
+    "IMM <A>, 0",
     "NOP"
   ],
   "SETLE": [ # IMPROVED
-    "IMM <A>, 0",
-    "BRG +2, <B>, <C>",
+    "BRG +3, <B>, <C>",
     "IMM <A>, &(1)",
+    "JMP +2",
+    "IMM <A>, 0",
     "NOP"
   ],
   "SETC": [
@@ -784,7 +790,7 @@ def replaceComplex(program):
         tempregptr += 1
       elif ins.opcode.name == "@V":
         tempregptr -= 1
-      if (ISA.Instruction_table.get(ins.opcode.name) == None and ISA.Instruction_table.get(getOperandStructure(ins)) == None and not (MWFULL_flag and MWFULL)) or (MWFULL_flag and MWFULL and ins.opcode.name not in translationList):
+      if (ISA.Instruction_table.get(ins.opcode.name) == None and ISA.Instruction_table.get(getOperandStructure(ins)) == None and not (MWFULL_flag and MWFULL) and not ISA.__name__ == "ISA_configs.Complex") or (MWFULL_flag and MWFULL and ins.opcode.name not in translationList):
         if "MW_" in ins.opcode.name:
           continue
         if "MULTI_" in ins.opcode.name:
@@ -1046,7 +1052,7 @@ def regSubstitution(program):
       tempregptr -= 1
       continue
     newOpcode = getOperandStructure(ins)
-    if (Instruction_table.get(ins.opcode.name) or ("_" in ins.opcode.name and ins.opcode.name[0].isnumeric())) and name in ("ISA_configs.Core","ISA_configs.Basic"):
+    if (Instruction_table.get(ins.opcode.name) or ("_" in ins.opcode.name and ins.opcode.name[0].isnumeric())) and name in ("ISA_configs.Core","ISA_configs.Basic","ISA_configs.Complex"):
       if not CPU_stats["REG_ONLY"]:
         continue
     if Instruction_table.get(newOpcode) == None and ins.opcode.name not in exempt and ins.opcode.type not in exempt:
@@ -1595,8 +1601,8 @@ def fullMultiword(program):
         # BGE - DONE
         # NOR - DONE
         # ADD - DONE
-        # LOD - BROKEN
-        # STR - BROKEN
+        # LOD - DONE
+        # STR - DONE
         # ---------- BASIC
         # MOV - DONE
         # BRG - DONE
@@ -1645,16 +1651,14 @@ def fullMultiword(program):
           else:
             translation += ["NOP"]
         elif opc == "BGE": # WORKS
-          if ins.operandList[1].equals(ins.operandList[2]):
+          if ins.operandList[1].equals(ins.operandList[2]) or ins.operandList[2].value == 0:
             translation += ["BGE <A>, $0, $0"]
           else:
             for w in range(WORDS):
               translation += [
-                f"BRG .exec, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]",
                 f"BRL .skip, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
                 ]
             translation += [
-              ".exec",
               f"JMP <A>",
               ".skip",
               "NOP"
@@ -1699,9 +1703,9 @@ def fullMultiword(program):
               "NOP"
             ]
         elif opc == "BRN":
-          translation += [f"BRN <A>, <B>[{WORDS-w-1}]"]
+          translation += [f"BRN <A>, <B>[{WORDS-1}]"]
         elif opc == "BRP":
-          translation += [f"BRP <A>, <B>[{WORDS-w-1}]"]
+          translation += [f"BRP <A>, <B>[{WORDS-1}]"]
         elif opc == "BNE":
           if ins.operandList[1].equals(ins.operandList[2]):
             translation += ["JMP <A>"]
@@ -1723,11 +1727,9 @@ def fullMultiword(program):
           else:
             for w in range(WORDS):
               translation += [
-                f"BRL .exec, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]",
                 f"BRG .skip, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
                 ]
             translation += [
-              ".exec",
               f"JMP <A>",
               ".skip",
               "NOP"
@@ -1738,11 +1740,9 @@ def fullMultiword(program):
           else:
             for w in range(WORDS):
               translation += [
-                f"BRL .exec, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]",
                 f"BGE .skip, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
                 ]
             translation += [
-              ".exec",
               f"JMP <A>",
               ".skip",
               "NOP"
@@ -1753,11 +1753,9 @@ def fullMultiword(program):
           else:
             for w in range(WORDS):
               translation += [
-                f"BRG .exec, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]",
                 f"BLE .skip, <B>[{WORDS-w-1}], <C>[{WORDS-w-1}]"
                 ]
             translation += [
-              ".exec",
               f"JMP <A>",
               ".skip",
               "NOP"
@@ -1808,20 +1806,37 @@ def fullMultiword(program):
             "@V"
             ]
         elif opc == "ADD": # WORKS
-          translation += ["@^", "IMM ^1, 0", "@^", "MW_MOV ^2, <C>", "MW_MOV <A>, <B>"]
+          translation += [
+            "@^",
+            "IMM ^1, 0", "@^",
+            "MW_MOV ^2, <C>",
+          ]
+          if not ins.operandList[0].equals(ins.operandList[1]):
+            translation.append("MW_MOV <A>, <B>")
           for w in range(WORDS):
-            translation += [
-              f"BRZ .skipinc{w}, ^1",
-              f"INC <A>[{w}], <A>[{w}]",
-              f"BNZ .skipinc{w}, <A>[{w}]",
-              f"IMM ^1, &(1)",
-              f"ADD <A>[{w}], <A>[{w}], ^2[{w}]",
-              f"JMP .next{w}",
-              f".skipinc{w}",
-              f"ADD <A>[{w}], <A>[{w}], ^2[{w}]",
-              f"SETG ^1, ^2[{w}], <A>[{w}]",
-              f".next{w}"
-            ]
+            if w == WORDS-1:
+              translation += [
+                f"BNZ .skipinc{w}, ^1",
+                f"INC <A>[{w}], <A>[{w}]",
+                f".skipinc{w}",
+                f"ADD <A>[{w}], <A>[{w}], ^2[{w}]",
+              ]
+            elif w != 0:
+              translation += [
+                f"BNZ .skipinc{w}, ^1",
+                f"INC <A>[{w}], <A>[{w}]",
+                f"MOV ^1, <A>[{w}]",
+                f".skipinc{w}",
+                f"ADD <A>[{w}], <A>[{w}], ^2[{w}]",
+                f"SETLE ^2[{w}], ^2[{w}], <A>[{w}]",
+                f"OR ^1 ^1 ^2[{w}]"
+              ]
+            else:
+              translation += [
+                f"ADD <A>[{w}], <A>[{w}], ^2[{w}]",
+                f"SETLE ^2[{w}], ^2[{w}], <A>[{w}]",
+                f"OR ^1 ^1 ^2[{w}]",
+              ]
           translation += ["@V", "@V"]
         elif opc == "RSH": # WORKS
           translation += ["@^", "IMM ^1, 0", "MW_MOV <A>, <B>"]
@@ -1946,6 +1961,7 @@ def main():
   global FINALSUB
   global MWFULL
   global MWFULL_flag
+  global WORDS
   if len(s.argv) > 2:
     program = importProgram(s.argv[2])
   else:
@@ -2003,13 +2019,27 @@ def main():
   if len(s.argv) > 4:
       filename = s.argv[4]
   outfile = open(filename, "w+")
+  aestheticOutput = True
   for ins in program:
       for lbl in ins.label:
           outfile.write("." + lbl.value + "\n")
-      outfile.write(ins.opcode.name + " " + ", ".join([prefixes.get(opr.type, "") + str(opr.value) if opr.word == 0 else prefixes.get(opr.type, "") + str(opr.value) + f"[{opr.word}]" for opr in ins.operandList]) + "\n")
+      if not ins.opcode.name[0].isnumeric() or not aestheticOutput:
+        outfile.write(ins.opcode.name + " " + " ".join([prefixes.get(opr.type, "") + str(opr.value) if opr.word == 0 else prefixes.get(opr.type, "") + str(opr.value) + f"[{opr.word}]" for opr in ins.operandList]) + "\n")
+      else:
+        ins.opcode.name = ins.opcode.name.split("_")[1]
+        outstr = ins.opcode.name + " " + " ".join([prefixes.get(opr.type, "") + str(opr.value) if opr.word == 0 else prefixes.get(opr.type, "") + str(opr.value) + f"[{opr.word}]" for opr in ins.operandList]) + "\n"
+        outstr = outstr.split()
+        if ins.opcode.type in ("branch") or ins.opcode.name in ("STR","IN"):
+          outstr[1] = "[" + outstr[1]
+          outstr[WORDS] = outstr[WORDS] + "]"
+        else:
+          outstr[2] = "[" + outstr[2]
+          outstr[WORDS+1] = outstr[WORDS+1] + "]"
+        outstr = " ".join(outstr) + "\n"
+        outfile.write(outstr)
   outfile.close()
   print(f"URCL code dumped in: {filename}")
-  if ISA.__name__ in ("ISA_configs.Emulate","ISA_configs.Core","ISA_configs.Basic"):
+  if ISA.__name__ in ("ISA_configs.Emulate","ISA_configs.Core","ISA_configs.Basic","ISA_configs.Complex"):
       return
   program = fixPorts(program)
   program = convertToISA(program)

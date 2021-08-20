@@ -58,6 +58,8 @@ Instruction_table = {
   "CPY":  [1],
   "BRC":  [1],
   "BNC":  [1],
+
+  
   }
 def RawURCL(a, b):return a, b
 def CleanURCL(a, b):return a, b

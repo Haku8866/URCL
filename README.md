@@ -15,23 +15,31 @@ You may also run the file without any parameters by simply entering:
 ```
 py URCL.py
 ```
-Additionally, you can use the special `Emulate` ISA to just use the URCL-simplification feature.
-Similarly, the special `Core` ISA produces code consisting of only core instructions.
+The special `Core` ISA produces code consisting of only core instructions.
+The `Basic` ISA produces code consisting of only basic instructions.
+The `Complex` ISA can be used if you just want to transform the program. For example, compiling a program to `Complex` will return source code without commas, changing R1 -> $1, M0 -> #0 etc.
+`Complex` is also useful if you'd like a copy of your code targeted at a lower `BITS` value using `@MWFULL`.
+Additionally, you can use the special `Emulate` ISA.
 The resulting code can be used with the included `URCL_Emulator.py`, which allows you to test the URCL program to find any bugs.
+Note that for multi-word programs, they must be compiled to `Core` to work with the emulator.
 ```
-py URCL_emulator.py <bits> <URCLoutput.urcl>
+py Emulator/URCL_emulator.py <bits> URCL_output/<URCL_output.urcl>
 ```
-The `<bits>` parameter is optional, as is `<URCLoutput.urcl>`.
-As with URCL.py, you cannot have `<URCLoutput.urcl>` without specifying `<bits>`.
+The `<bits>` parameter is optional, as is `<URCL_output.urcl>`.
+As with URCL.py, you cannot have `<URCL_output.urcl>` without specifying `<bits>`.
 
 # Pragmas and other unofficial addons
 You can have a single character string as an immediate. The ascii value will be used:
 ```
-IMM $1 "A" // 'A' is also valid
+IMM $1 "A"
+IMM $2 'B'
+IMM $3 "\n"
 ```
 Will become:
 ```
 IMM $1 65
+IMM $2 66
+IMM $3 10
 ```
 Control characters can be used with this system too, these are:
 ```
@@ -59,15 +67,16 @@ Pointers can only be used in: ADD, SUB, INC, DEC, IMM, MOV, LOD, STR, LLOD, LSTR
 @MWSP states that the stack pointer should be multi-word, if necessary.
 @MWADDR states that memory addresses and memory pointers should be multi-word, if necessary.
 @MWLABEL states that labels should be multi-word, if necessary.
-@MWFULL is **full** multiword. This means a 1-bit CPU could run a program like this:
+@MWFULL is **full** multiword. This means an 8-bit CPU could run a program like this:
 ```
-BITS 16
+BITS == 16
 IMM $1 2000
 IMM $2 3000
 MLT $3 $2 $1
 OUT %NUMB $3
 ```
-Note that because I don't have multi-word translations for all instructions, @MWFULL programs will end up being very long.
+@MWFULL programs will end up being very long, due to the nature of multiword because for operations like BGE, you must check each word of each operand, which takes many instructions.
+As a reference, the sample program above expands to 56 URCL instructions when compiled to `BITS == 8`.
 
 # What it does
 You can think of this is a framework to help you easily compile URCL to your ISA without starting from the ground up.
@@ -79,7 +88,7 @@ Here's a list of things the compiler does for you:
  . Optional multi-word support.
 
 # How to get a URCL -> your ISA compiler working
-There's an ExampleISA.py config file provided, this is roughly what a config file will look like, based off my own HPU4 instruction set.
+There's an ExampleISA.py config file provided, this is roughly what a config file will look like.
 There is also a Template.py config file provided, this is a blank config file ready to be filled in.
 Here's a list of things you need to do to support URCL:
  . Add translations written in your ISA for the 7 core URCL instructions.
