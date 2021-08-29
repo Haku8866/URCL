@@ -296,12 +296,12 @@ cmplx_subs = {
   ],
   # COMPLEX TRANSLATIONS
   "MLT": [ # IMPROVED
-    "IMM <A>, 0",
-    "BRZ +10, <C>",
     "@^",
     "MOV ^1, <C>",
     "@^",
     "MOV ^2, <B>",
+    "IMM <A>, 0",
+    "BRZ +6, ^1",
     "DEC ^1, ^1",
     "ADD <A>, <A>, ^2",
     "BNZ -2, ^1",
