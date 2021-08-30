@@ -158,7 +158,7 @@ def getState(program_input, databuswidth):
   PIX_DISPLAY_X = 0
   PIX_DISPLAY_Y = 0
 
-  PIX_DISPLAY = [["  " for x in range(0, 16)] for y in range(0, 16)]
+  PIX_DISPLAY = [["  "]]
 
   reverseLABEL = {}
   FLAG = {
@@ -410,6 +410,10 @@ def getState(program_input, databuswidth):
         draw = "  "
         if val != 0:
           draw = "██"
+        while len(PIX_DISPLAY) <= PIX_DISPLAY_Y:
+          PIX_DISPLAY.append(["  "])
+        while len(PIX_DISPLAY[PIX_DISPLAY_Y]) <= PIX_DISPLAY_X:
+          PIX_DISPLAY[PIX_DISPLAY_Y].append("  ")
         PIX_DISPLAY[PIX_DISPLAY_Y][PIX_DISPLAY_X] = draw
       else:
         OUTPUT.append(val)
@@ -513,6 +517,10 @@ def getState(program_input, databuswidth):
           draw = "  "
           if val != 0:
             draw = "██"
+          while len(PIX_DISPLAY) <= PIX_DISPLAY_Y:
+            PIX_DISPLAY.append(["  "])
+          while len(PIX_DISPLAY[PIX_DISPLAY_Y]) <= PIX_DISPLAY_X:
+            PIX_DISPLAY[PIX_DISPLAY_Y].append("  ")
           PIX_DISPLAY[PIX_DISPLAY_Y][PIX_DISPLAY_X] = draw
         else:
           OUTPUT.append(val)
