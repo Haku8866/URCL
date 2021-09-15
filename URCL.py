@@ -193,27 +193,27 @@ cmplx_subs = {
     "NOT <A>, <A>"
   ],
   "BRL": [
-    "BGE +2, <B>, <C>",
+    "BGE ~2, <B>, <C>",
     "JMP <A>",
     "NOP"
   ],
   "BRG": [
-    "BGE +2, <C>, <B>",
+    "BGE ~2, <C>, <B>",
     "JMP <A>",
     "NOP"
   ],
   "BRE": [
-    "BGE +2, <B>, <C>",
-    "JMP +4",
-    "BGE +2, <C>, <B>",
-    "JMP +2",
+    "BGE ~2, <B>, <C>",
+    "JMP ~4",
+    "BGE ~2, <C>, <B>",
+    "JMP ~2",
     "JMP <A>",
     "NOP"
   ],
   "BNE": [
-    "BGE +2, <B>, <C>",
-    "JMP +2",
-    "BGE +2, <C>, <B>",
+    "BGE ~2, <B>, <C>",
+    "JMP ~2",
+    "BGE ~2, <C>, <B>",
     "JMP <A>",
     "NOP"
   ],
@@ -226,7 +226,7 @@ cmplx_subs = {
   "BEV": [
     "@^",
     "AND ^1, <B>, 1",
-    "BGE +3, ^1, 1",
+    "BGE ~3, ^1, 1",
     "@V",
     "JMP <A>",
     "NOP"
@@ -235,7 +235,7 @@ cmplx_subs = {
     "BGE <A>, <C>, <B>"
   ],
   "BRZ": [
-    "BGE +2, <B>, 1",
+    "BGE ~2, <B>, 1",
     "JMP <A>",
     "NOP"
   ],
@@ -246,7 +246,7 @@ cmplx_subs = {
     "BGE <A>, <B>, &1(0)"
   ],
   "BRP": [
-    "BGE +2, <B>, &1(0)",
+    "BGE ~2, <B>, &1(0)",
     "JMP <A>",
     "NOP"
   ],
@@ -290,7 +290,7 @@ cmplx_subs = {
   "BNC": [
     "@^",
     "ADD ^1, <B>, <C>",
-    "BRL +2, ^1, <B>",
+    "BRL ~2, ^1, <B>",
     "BGE <A>, ^1, <C>",
     "@V"
   ],
@@ -301,24 +301,24 @@ cmplx_subs = {
     "@^",
     "MOV ^2, <B>",
     "IMM <A>, 0",
-    "BRZ +6, ^1",
+    "BRZ ~6, ^1",
     "DEC ^1, ^1",
     "ADD <A>, <A>, ^2",
-    "BNZ -2, ^1",
+    "BNZ ~-2, ^1",
     "@V",
     "@V",
     "NOP"
   ],
   "DIV": [ # IMPROVED
     "IMM <A>, 0",
-    "BRL +10, <B>, <C>",
+    "BRL ~10, <B>, <C>",
     "@^",
     "MOV ^1, <B>",
     "@^",
     "MOV ^2, <C>",
     "INC <A>, <A>",
     "SUB ^1, ^1, ^2",
-    "BGE -2, ^1, ^2",
+    "BGE ~-2, ^1, ^2",
     "@V",
     "@V",
     "NOP"
@@ -327,9 +327,9 @@ cmplx_subs = {
     "@^",
     "MOV ^1, <C>",
     "MOV <A>, <B>",
-    "BRL +4, <A>, ^1",
+    "BRL ~4, <A>, ^1",
     "SUB <A>, <A>, ^1",
-    "JMP -2",
+    "JMP ~-2",
     "@V",
     "NOP"
   ],
@@ -337,10 +337,10 @@ cmplx_subs = {
     "@^",
     "MOV ^1, <C>",
     "MOV <A>, <B>",
-    "BRZ +5, ^1",
+    "BRZ ~5, ^1",
     "RSH <A>, <A>",
     "DEC ^1, ^1",
-    "JMP -3",
+    "JMP ~-3",
     "@V",
     "NOP"
   ],
@@ -348,17 +348,17 @@ cmplx_subs = {
     "@^",
     "MOV ^1, <C>",
     "MOV <A>, <B>",
-    "BRZ +5, ^1",
+    "BRZ ~5, ^1",
     "LSH <A>, <A>",
     "DEC ^1, ^1",
-    "JMP -3",
+    "JMP ~-3",
     "@V",
     "NOP"
   ],
   "SRS": [
-    "BRN +3, <B>",
+    "BRN ~3, <B>",
     "RSH <A>, <B>",
-    "JMP +3",
+    "JMP ~3",
     "RSH <A>, <B>",
     "ADD <A>, <A>, &1(0)",
     "NOP"
@@ -367,59 +367,59 @@ cmplx_subs = {
     "@^",
     "MOV ^1, <C>",
     "MOV <A>, <B>",
-    "BRZ +5, ^1",
+    "BRZ ~5, ^1",
     "SRS <A>, <A>",
     "DEC ^1, ^1",
-    "JMP -3",
+    "JMP ~-3",
     "@V",
     "NOP"
   ],
   "SETE": [ # IMPROVED
-    "BNE +3, <B>, <C>",
+    "BNE ~3, <B>, <C>",
     "IMM <A>, &(1)",
-    "JMP +2",
+    "JMP ~2",
     "IMM <A>, 0",
     "NOP"
   ],
   "SETNE": [ # IMPROVED
-    "BRE +3, <B>, <C>",
+    "BRE ~3, <B>, <C>",
     "IMM <A>, &(1)",
-    "JMP +2",
+    "JMP ~2",
     "IMM <A>, 0",
     "NOP"
   ],
   "SETG": [ # IMPROVED
-    "BLE +3, <B>, <C>",
+    "BLE ~3, <B>, <C>",
     "IMM <A>, &(1)",
-    "JMP +2",
+    "JMP ~2",
     "IMM <A>, 0",
     "NOP"
   ],
   "SETL": [ # IMPROVED
-    "BGE +3, <B>, <C>",
+    "BGE ~3, <B>, <C>",
     "IMM <A>, &(1)",
-    "JMP +2",
+    "JMP ~2",
     "IMM <A>, 0",
     "NOP"
   ],
   "SETGE": [ # IMPROVED
-    "BRL +3, <B>, <C>",
+    "BRL ~3, <B>, <C>",
     "IMM <A>, &(1)",
-    "JMP +2",
+    "JMP ~2",
     "IMM <A>, 0",
     "NOP"
   ],
   "SETLE": [ # IMPROVED
-    "BRG +3, <B>, <C>",
+    "BRG ~3, <B>, <C>",
     "IMM <A>, &(1)",
-    "JMP +2",
+    "JMP ~2",
     "IMM <A>, 0",
     "NOP"
   ],
   "SETC": [
     "@^",
     "MOV ^1, <B>",
-    "BRG +2, <B>, <C>",
+    "BRG ~2, <B>, <C>",
     "MOV ^1, <C>",
     "ADD <A>, <B>, <C>",
     "SETL <A>, <A>, ^1",
@@ -428,7 +428,7 @@ cmplx_subs = {
   "SETNC": [
     "@^",
     "MOV ^1, <B>",
-    "BRG +2, <B>, <C>",
+    "BRG ~2, <B>, <C>",
     "MOV ^1, <C>",
     "ADD <A>, <B>, <C>",
     "SETL <A>, <A>, ^1",
@@ -520,11 +520,11 @@ def convertOperands(program):
         ins.operandList[y] = operand("memAddr", int(opr[1:]), word)
       elif opr[0] == ".":
         ins.operandList[y] = operand("label", opr[1:], word)
-      elif (opr[0] == "+" or opr[0] == "-") and ins.opcode.type == "branch":
-        ins.operandList[y] = operand("relativeAddr", int(opr), word)
+      elif opr[0] == "~":
+        ins.operandList[y] = operand("relativeAddr", int(opr[1:]), word)
       elif opr == "SP":
         ins.operandList[y] = operand("stackPtr", "", word)
-      elif opr[0] == "&":
+      elif opr[0] in "&@" and opr[1:] in ("MSB","LSB","BITS","SMSB","MAX","SMAX","UHALF","LHALF","MINREG","MINRAM","MINHEAP","MINSTACK"):
         ins.operandList[y] = operand("bitPattern", opr[1:], word)
       elif opr[0] == "%":
         ins.operandList[y] = operand("port", opr[1:], word)
@@ -606,6 +606,9 @@ def readHeaders(program):
 
 def evaluateBitPattern(bitPattern):
   global BITS
+  global MINREG
+  global MINRAM
+  global MINSTACK
   # Converts operand objects of type "bitPattern" to operand objects of type "number"
   # Allows bit patterns in the form &(1)(0)+c where c is a constant
   opr = bitPattern.value
@@ -624,6 +627,12 @@ def evaluateBitPattern(bitPattern):
     opr = "(0)(1)"
   elif opr == "BITS":
     return operand("number", BITS)
+  elif opr == "MINREG":
+    return operand("number", MINREG)
+  elif opr == "MINRAM" or opr == "MINHEAP":
+    return operand("number", MINRAM)
+  elif opr == "MINSTACK":
+    return operand("number", MINSTACK)
   if "+" in opr:
     opr, c = opr.split("+")
     c = int(c)
@@ -699,11 +708,11 @@ def parseIns(ins):
       ins.operandList[y] = operand("memAddr", int(opr[1:]), word)
     elif opr[0] == ".":
       ins.operandList[y] = operand("label", opr[1:], word)
-    elif opr[0] == "+" or opr[0] == "-" and ins.opcode.type == "branch":
-      ins.operandList[y] = operand("relativeAddr", int(opr), word)
+    elif opr[0] == "~":
+      ins.operandList[y] = operand("relativeAddr", int(opr[1:]), word)
     elif opr == "SP":
       ins.operandList[y] = operand("stackPtr", "", word)
-    elif opr[0] == "&":
+    elif opr[0] in "&@" and opr[1:] in ("MSB","LSB","BITS","SMSB","MAX","SMAX","UHALF","LHALF","MINREG","MINRAM","MINHEAP","MINSTACK"):
       ins.operandList[y] = operand("bitPattern", opr[1:], word)
     elif opr[0] == "%":
       ins.operandList[y] = operand("port", opr[1:], word)
