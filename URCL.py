@@ -47,6 +47,7 @@ opcodes = {
   "MINSTACK": ("header", "core"),
   "RUN": ("header", "core"),
   
+  "@NEXT": ("pragma", "other"),
   "@MWADDR": ("pragma", "other"),
   "@MWLABEL": ("pragma", "other"),
   "@MWSP": ("pragma", "other"),
@@ -569,6 +570,7 @@ def readHeaders(program):
   global MWLABEL
   global MWSP
   global MWFULL
+  global NEXT
   done = False
   while not done:
     done = True
@@ -586,6 +588,8 @@ def readHeaders(program):
           MINREG = ins.operandList[0].value
         elif ins.opcode.name == "BITS":
           PROGBITS = ins.operandList[1].value
+        elif ins.opcode.name == "@NEXT":
+          NEXT = True
         elif ins.opcode.name == "@MWADDR":
           MWADDR = True
         elif ins.opcode.name == "@MWLABEL":
@@ -1445,6 +1449,8 @@ def initialiseGlobals():
   MWFULL = False
   global MWFULL_flag
   MWFULL_flag = True
+  global NEXT
+  NEXT = False
   return
 
 def removeISALabels(program):
@@ -1989,6 +1995,8 @@ def deflateRegs(program):
   return program
 
 def convertOperandsWithHeaders(program):
+  global NEXT
+  global labelCount
   for x, ins in enumerate(program):
     for y, opr in enumerate(ins.operandList):
       if opr.type == "number" and opr.value < 0:
@@ -1996,6 +2004,37 @@ def convertOperandsWithHeaders(program):
           program[x].operandList[y].value = (opr.value)&((2**BITS)-1)
         else:
           program[x].operandList[y].value = (opr.value)&((2**PROGBITS)-1)
+      elif opr.type == "label" and NEXT:
+        if len(opr.value) < 4:
+          continue
+        if opr.value[:4] != "next":
+          continue
+        if len(opr.value) > 4:
+          if not opr.value[4:].isnumeric():
+            continue
+        done = False
+        for z, ins2 in enumerate(program[x+1:]):
+          if done:
+            break
+          for l in ins2.label:
+            if l.equals(opr):
+              program[x + z + 1].label.append(operand("label", f"__label__{labelCount}"))
+              program[x].operandList[y] = operand("label", f"__label__{labelCount}")
+              labelCount += 1
+              done = True
+              break
+  if NEXT:
+    for x, ins in enumerate(program):
+      for l, lbl in enumerate(program[x].label):
+        if len(lbl.value) < 4:
+          continue
+        if lbl.value[:4] != "next":
+          continue
+        if len(lbl.value) > 4:
+          if not lbl.value[4:].isnumeric():
+            continue
+        program[x].label[l] = None
+      program[x].label = list(filter(None, program[x].label))
   return program
 
 def removeDW(program):
