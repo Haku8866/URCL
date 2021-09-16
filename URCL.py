@@ -502,10 +502,11 @@ def convertToInstructions(program):
             insNew.operandList[0] = insNew.operandList[0][1:]
             insNew.operandList[-1] = insNew.operandList[-1][:-1]
           insert = [instruction([], "DW", [opr.strip(",")]) for opr in insNew.operandList]
-        if insNew.opcode == "DW" and insNew.operandList[0][0] == '"':
-          insNew.operandList[0] = insNew.operandList[0][1:-1]
-          insert = [instruction([], "DW", [f"'{c}'"]) for c in insNew.operandList[0]]
-      if insert is not None:
+        if insNew.opcode == "DW":
+          if insNew.operandList[0][0] == '"':
+            insNew.operandList[0] = insNew.operandList[0][1:-1]
+            insert = [instruction([], "DW", [f"'{c}'"]) for c in insNew.operandList[0]]
+      if insert != []:
         insert[0].label = insNew.label
         code += insert
       else:
@@ -2020,28 +2021,42 @@ def convertOperandsWithHeaders(program):
       elif opr.type == "label" and NEXT:
         if len(opr.value) < 4:
           continue
-        if opr.value[:4] != "next":
+        if opr.value[:4] not in ("next","prev"):
           continue
         if len(opr.value) > 4:
           if not opr.value[4:].isnumeric():
             continue
         done = False
-        for z, ins2 in enumerate(program[x+1:]):
-          if done:
-            break
-          for l in ins2.label:
-            if l.equals(opr):
-              program[x + z + 1].label.append(operand("label", f"__label__{labelCount}"))
-              program[x].operandList[y] = operand("label", f"__label__{labelCount}")
-              labelCount += 1
-              done = True
+        if opr.value[:4] == "next":
+          for z, ins2 in enumerate(program[x+1:]):
+            if done:
               break
+            for l in ins2.label:
+              if l.equals(opr):
+                program[x + z + 1].label.append(operand("label", f"__label__{labelCount}"))
+                program[x].operandList[y] = operand("label", f"__label__{labelCount}")
+                labelCount += 1
+                done = True
+                break
+        else:
+          rev = program[:x]
+          rev.reverse()
+          for z, ins2 in enumerate(rev):
+            if done:
+              break
+            for l in ins2.label:
+              if l.equals(opr):
+                program[x-z-1].label.append(operand("label", f"__label__{labelCount}"))
+                program[x].operandList[y] = operand("label", f"__label__{labelCount}")
+                labelCount += 1
+                done = True
+                break
   if NEXT:
     for x, ins in enumerate(program):
       for l, lbl in enumerate(program[x].label):
         if len(lbl.value) < 4:
           continue
-        if lbl.value[:4] != "next":
+        if lbl.value[:4] not in ("next","prev"):
           continue
         if len(lbl.value) > 4:
           if not lbl.value[4:].isnumeric():
