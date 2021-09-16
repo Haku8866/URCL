@@ -488,6 +488,7 @@ def convertToInstructions(program):
     labels = []
     for x, ins in enumerate(program):
       insNew = instruction([], "", [])
+      insert = []
       ins = ins.split()
       if ins[0][0] == ".":
         labels.append(ins[0][1:])
@@ -496,7 +497,19 @@ def convertToInstructions(program):
         insNew.opcode = ins[0]
         insNew.label = labels
         insNew.operandList = [y.rstrip(",") for y in ins[1:]]
-      code.append(insNew)
+        if insNew.opcode == "DW" and len(insNew.operandList) > 1:
+          if insNew.operandList[0][0] == "[":
+            insNew.operandList[0] = insNew.operandList[0][1:]
+            insNew.operandList[-1] = insNew.operandList[-1][:-1]
+          insert = [instruction([], "DW", [opr.strip(",")]) for opr in insNew.operandList]
+        if insNew.opcode == "DW" and insNew.operandList[0][0] == '"':
+          insNew.operandList[0] = insNew.operandList[0][1:-1]
+          insert = [instruction([], "DW", [f"'{c}'"]) for c in insNew.operandList[0]]
+      if insert is not None:
+        insert[0].label = insNew.label
+        code += insert
+      else:
+        code.append(insNew)
       labels = []
     return list(filter(None, code))
 
