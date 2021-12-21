@@ -288,8 +288,8 @@ HLT
         IN $2 %RNG
         AND $2 $2 0b00000011
         LLOD $4 #73 $2
-        LSTR $4 #73 $1
-        LSTR $3 #73 $2
+        LSTR $1 #73 $4
+        LSTR $2 #73 $3
         BRZ .swapLoopEnd $5
         DEC $5 $5
         JMP .swapLoop
