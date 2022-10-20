@@ -1,8 +1,21 @@
+from lib2to3.pytree import convert
 import sys as s
 import os
 import copy
 import math
 import time
+
+validPragmas = {
+    "DuplicateDefines": [
+        ["error", "warning", "silent"],
+        ["ignore", "overwrite"]]
+}
+
+defaultPragmas = {
+    "DuplicateDefines": ["warning", "overwrite"]
+}
+
+pragmas = defaultPragmas
 
 class instruction:
   def __init__(self, label, opcode, operandList=[]):
@@ -455,11 +468,41 @@ def importProgram(name):
         end(ex, "- try checking:\n1. Is it in a different folder to URCL.py?\n2. Are you running URCL.py from elsewhere?\n 3. 'invalid syntax'? An error with the ISA designer's code.",)
 
 def parseURCL(program):
-  program = removeComments(program)
-  program = convertToInstructions(program)
-  program = convertOperands(program)
-  program = fixOperands(program)
-  return program
+    program = removeComments(program)
+    program = handlePragmas(program)
+    program = replaceIncludes(program)
+    program = replaceDefines(program)
+    program = convertAddresses(program)
+    program = replaceDefines(program)
+    program = convertToInstructions(program)
+    program = convertOperands(program)
+    program = fixOperands(program)
+    return program
+
+def handlePragmas(program):
+    global validPragmas
+    global pragmas
+    seen = []
+    code = []
+    for x,line in enumerate(program):
+        line = line.split()
+        if line[0] == "@PRAGMA":
+            opts = line[2:]
+            if line[1] in seen:
+                print(f"ERROR - DUPLICATE PRAGMA - Directive {line[1]} already set!")
+                raise Exception("Compiler error! See compiler log for more information!")
+            else:
+                seen.append(line[1])
+            flags = validPragmas.get(line[1])
+            if (flags):
+                for option in opts:
+                    for i in range(len(flags)):
+                        if option in flags[i]:
+                            pragmas[line[1]][i] = option
+        else:
+            code.append(" ".join(line))
+    return list(filter(None, code))
+
 
 def removeComments(program):
     # Removes all comments from the code
@@ -468,17 +511,75 @@ def removeComments(program):
     # Removes any empty lines
     code = []
     for x, line in enumerate(program):
-      line = line.split("//")[0]
-      line = line.split(";")[0]
-      line = line.split()
-      for y, token in enumerate(line):
-        if token[0] == "R" and token[1:].rstrip(",").isnumeric():
-          line[y] = "$" + token[1:]
-        elif token[0] == "M" and token[1:].rstrip(",").isnumeric():
-          line[y] = "#" + token[1:]
-      line = " ".join(line)
-      if line != "":
-        code.append(line)
+        if line != None and line[:2] != "//" and line[:1] != ";" and line != "":
+            line = line.split("//")[0]
+            line = line.split(";")[0]
+            line = line.split()
+            code.append(" ".join(line))
+    return list(filter(None, code))
+
+def replaceIncludes(program):
+    # Replaces @INCLUDE <file> macros with the text inside <file>
+    code = []
+    for x,line in enumerate(program):
+        line = line.split()
+        if line[0] == "@INCLUDE":
+            file = " ".join(line[1:]).strip()
+            insert = removeComments([l.strip() for l in open(file, "r", encoding="utf8")])
+            for l in insert:
+                code.append(l)
+        else:
+            code.append(" ".join(line))
+    return list(filter(None, code))
+
+def replaceDefines(program):
+    # Parses @DEFINE macros and replaces
+    # Default behavior - Prints a warning and overrides define but DOES NOT throw an error for duplicate defines
+    code = []
+    defines = [[],[]]
+    for x,line in enumerate(program):
+        line = line.split()
+        if line[0] == "@DEFINE":
+            if line[1] in defines[0]:
+                match (pragmas["DuplicateDefines"][0]):
+                    case "silent":
+                        pass
+
+                    case "warning":
+                        print(f"WARNING - DUPLICATE DEFINE - {line[1]} is defined more than once")
+                        match (pragmas["DuplicateDefines"][1]):
+                            case "ignore":
+                                print(f"    Keeping old value {defines[1][defines[0].index(line[1])]} and ignoring new value {line[2]}")
+
+                            case "overwrite":
+                                print(f"    Overwriting old value {defines[1][defines[0].index(line[1])]} with new value {line[2]}")
+
+                    case "error":
+                        print(f"ERROR - DUPLICATE DEFINE - {line[1]} is defined more than once")
+                        raise Exception("Compiler error! See compiler log for more information!")
+
+                if (pragmas["DuplicateDefines"][1] == "overwrite"):
+                    defines[1][defines[0].index(line[1])] = line[2] 
+            else:
+                defines[0].append(line[1])
+                defines[1].append(line[2])
+        else:
+            for token in range(len(line)):
+                if line[token] in defines[0]:
+                    line[token] = defines[1][defines[0].index(line[token])]
+            code.append(" ".join(line))
+    return list(filter(None, code))
+
+def convertAddresses(program):
+    code = []
+    for x,line in enumerate(program):
+        line = line.split()
+        for y, token in enumerate(line):
+            if token[0] == "R" and token[1:].rstrip(",").isnumeric():
+                line[y] = "$" + token[1:]
+            elif token[0] == "M" and token[1:].rstrip(",").isnumeric():
+                line[y] = "#" + token[1:]
+        code.append(" ".join(line))
     return list(filter(None, code))
 
 def convertToInstructions(program):
